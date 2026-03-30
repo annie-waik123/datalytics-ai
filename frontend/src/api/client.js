@@ -9,10 +9,10 @@ const SESSION_KEY = 'ml_dashboard_session_id'
 
 function getBaseUrl() {
   if (typeof window === 'undefined') {
-    return 'http://127.0.0.1:8000/api'
+    return '/api'
   }
 
-  return `http://${window.location.hostname || '127.0.0.1'}:8000/api`
+  return '/api'
 }
 
 function getSessionId() {

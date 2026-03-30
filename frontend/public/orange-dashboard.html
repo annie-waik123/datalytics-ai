@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datalytics - Data Analytics Platform</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #F3F4F6;
+            color: #1F2937;
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            width: 200px;
+            background-color: white;
+            border-right: 1px solid #E5E7EB;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+        }
+        
+        .sidebar.collapsed {
+            width: 60px;
+        }
+        
+        .logo {
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            border-bottom: 1px solid #E5E7EB;
+        }
+        
+        .logo-icon {
+            width: 24px;
+            height: 24px;
+            background-color: #F97316;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .logo-text {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: #1F2937;
+        }
+        
+        .sidebar.collapsed .logo-text {
+            display: none;
+        }
+        
+        .collapse-btn {
+            margin-left: auto;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0.25rem;
+            color: #6B7280;
+        }
+        
+        .section-label {
+            padding: 0.75rem 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .nav-item {
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        
+        .nav-item:hover {
+            background-color: #F9FAFB;
+        }
+        
+        .nav-item.active {
+            background-color: #F97316;
+            color: white;
+        }
+        
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .sidebar-bottom {
+            margin-top: auto;
+            border-top: 1px solid #E5E7EB;
+        }
+        
+        .nav-item.logout {
+            color: #EF4444;
+        }
+        
+        .nav-item.logout:hover {
+            background-color: #FEE2E2;
+        }
+        
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: #F3F4F6;
+        }
+        
+        /* Top Navbar */
+        .top-navbar {
+            background-color: white;
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0.75rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .search-bar {
+            flex: 1;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 0.5rem 1rem 0.5rem 2.5rem;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            background-color: #F9FAFB;
+            font-size: 0.9rem;
+        }
+        
+        .search-wrapper {
+            position: relative;
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6B7280;
+        }
+        
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .icon-btn {
+            background: none;
+            border: none;
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 8px;
+            color: #6B7280;
+            position: relative;
+        }
+        
+        .icon-btn:hover {
+            background-color: #F9FAFB;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: 0.25rem;
+            right: 0.25rem;
+            width: 8px;
+            height: 8px;
+            background-color: #F97316;
+            border-radius: 50%;
+        }
+        
+        .profile-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .profile-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #F97316;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        
+        .profile-name {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+        
+        /* Page Content */
+        .page-content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+        
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+            color: #6B7280;
+        }
+        
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #1F2937;
+        }
+        
+        .page-subtitle {
+            font-size: 1rem;
+            color: #6B7280;
+            margin-bottom: 2rem;
+        }
+        
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed #D1D5DB;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            background-color: white;
+            margin-bottom: 2rem;
+            transition: all 0.2s ease;
+        }
+        
+        .upload-zone:hover {
+            border-color: #F97316;
+            background-color: #FFFBEB;
+        }
+        
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            background-color: #FED7AA;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.5rem;
+            color: #F97316;
+        }
+        
+        .upload-text {
+            margin-bottom: 1.5rem;
+        }
+        
+        .upload-text h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .browse-link {
+            color: #F97316;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        
+        .upload-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid #D1D5DB;
+            background-color: white;
+            transition: all 0.2s ease;
+        }
+        
+        .btn-green {
+            border-color: #10B981;
+            color: #10B981;
+        }
+        
+        .btn-green:hover {
+            background-color: #ECFDF5;
+        }
+        
+        .upload-note {
+            font-size: 0.875rem;
+            color: #6B7280;
+        }
+        
+        /* Top Buttons */
+        .top-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-bottom: 2rem;
+        }
+        
+        .btn-outlined {
+            background-color: white;
+            border: 1px solid #D1D5DB;
+            color: #374151;
+        }
+        
+        .btn-outlined:hover {
+            background-color: #F9FAFB;
+        }
+        
+        .btn-orange {
+            background: linear-gradient(135deg, #F97316, #EA580C);
+            color: white;
+            border: none;
+        }
+        
+        .btn-orange:hover {
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+        }
+        
+        /* Right Panel */
+        .right-panel {
+            width: 320px;
+            padding-left: 2rem;
+        }
+        
+        .panel-card {
+            background-color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .panel-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            gap: 1rem;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .stat-label {
+            color: #6B7280;
+            font-size: 0.9rem;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .orange-gradient {
+            background: linear-gradient(135deg, #F97316, #EA580C);
+            color: white;
+        }
+        
+        .orange-gradient .panel-title,
+        .orange-gradient .stat-label {
+            color: white;
+        }
+        
+        .format-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .format-icon {
+            width: 40px;
+            height: 40px;
+            background-color: #F3F4F6;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+        
+        .format-icon.csv {
+            background-color: #D1FAE5;
+            color: #10B981;
+        }
+        
+        .format-icon.excel {
+            background-color: #DBEAFE;
+            color: #2563EB;
+        }
+        
+        /* Page Sections */
+        .page-section {
+            display: none;
+        }
+        
+        .page-section.active {
+            display: block;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 2rem;
+        }
+        
+        /* Chatbot */
+        .chatbot-fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px;
+            height: 56px;
+            background-color: #F97316;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(249, 115, 22, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .chatbot-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(249, 115, 22, 0.4);
+        }
+        
+        .chat-panel {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 300px;
+            height: 400px;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+        }
+        
+        .chat-panel.open {
+            display: flex;
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid #E5E7EB;
+            font-weight: 600;
+            background-color: #F97316;
+            color: white;
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+        
+        .chat-input-area {
+            padding: 1rem;
+            border-top: 1px solid #E5E7EB;
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .chat-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #E5E7EB;
+            border-radius: 6px;
+        }
+        
+        .chat-send {
+            background-color: #F97316;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60px;
+            }
+            
+            .logo-text,
+            .section-label,
+            .nav-item span:not(.nav-icon),
+            .profile-name {
+                display: none;
+            }
+            
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .right-panel {
+                width: 100%;
+                padding-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="logo">
+                <div class="logo-icon">📊</div>
+                <span class="logo-text">Datalytics</span>
+                <button class="collapse-btn" onclick="toggleSidebar()">
+                    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="section-label">DATA IMPORT</div>
+            <button class="nav-item active" onclick="showPage('upload')">
+                <span class="nav-icon">📤</span>
+                <span>Upload CSV/Excel</span>
+            </button>
+            <button class="nav-item" onclick="showPage('connect')">
+                <span class="nav-icon">🔗</span>
+                <span>Connect Data Sources</span>
+            </button>
+            
+            <div class="section-label">NAVIGATION</div>
+            <button class="nav-item" onclick="showPage('home')">
+                <span class="nav-icon">🏠</span>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" onclick="showPage('dashboard')">
+                <span class="nav-icon">📈</span>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-item" onclick="showPage('predictions')">
+                <span class="nav-icon">🤖</span>
+                <span>Predictions</span>
+            </button>
+            <button class="nav-item" onclick="showPage('analytics')">
+                <span class="nav-icon">📊</span>
+                <span>Analytics</span>
+            </button>
+            <button class="nav-item" onclick="showPage('tables')">
+                <span class="nav-icon">📋</span>
+                <span>Data Tables</span>
+            </button>
+            <button class="nav-item" onclick="showPage('reports')">
+                <span class="nav-icon">📄</span>
+                <span>Reports</span>
+            </button>
+            <button class="nav-item" onclick="showPage('ai')">
+                <span class="nav-icon">🧠</span>
+                <span>AI Assistant</span>
+            </button>
+            
+            <div class="sidebar-bottom">
+                <button class="nav-item" onclick="showPage('profile')">
+                    <span class="nav-icon">👤</span>
+                    <span>Profile</span>
+                </button>
+                <button class="nav-item" onclick="showPage('settings')">
+                    <span class="nav-icon">⚙️</span>
+                    <span>Settings</span>
+                </button>
+                <button class="nav-item logout">
+                    <span class="nav-icon">🚪</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Navbar -->
+            <nav class="top-navbar">
+                <div class="search-bar">
+                    <div class="search-wrapper">
+                        <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="7" cy="7" r="6"/>
+                            <path d="M13 13l4 4"/>
+                        </svg>
+                        <input type="text" class="search-input" placeholder="Search anything...">
+                    </div>
+                </div>
+                
+                <div class="navbar-right">
+                    <button class="icon-btn" onclick="toggleDarkMode()">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="5"/>
+                            <path d="M12 1v2m0 16v2m11-9h-2M3 12H1m16.48-6.36l-1.42 1.42M6.05 6.05L4.63 4.63m12.74 12.74l-1.42-1.42M6.05 17.95l-1.42 1.42"/>
+                        </svg>
+                    </button>
+                    <button class="icon-btn" onclick="showNotifications()">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <span class="notification-badge"></span>
+                    </button>
+                    <div class="profile-info">
+                        <div class="profile-avatar">SS</div>
+                        <span class="profile-name">SANGAM SINGH</span>
+                    </div>
+                    <button class="icon-btn logout">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4m7 14l5-5-5-5m5 5H9"/>
+                        </svg>
+                    </button>
+                </div>
+            </nav>
+            
+            <!-- Page Content -->
+            <div class="page-content">
+                <!-- 01. Dataset Upload -->
+                <div class="page-section active" id="upload-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Upload Data</span>
+                    </div>
+                    <h1 class="page-title">Upload CSV & Excel Files</h1>
+                    <p class="page-subtitle">Import your data files to start analyzing</p>
+                    
+                    <div class="top-buttons">
+                        <button class="btn btn-outlined">Clear All</button>
+                        <button class="btn btn-orange">
+                            ✨ Process All Files
+                        </button>
+                    </div>
+                    
+                    <div class="content-grid">
+                        <div>
+                            <div class="upload-zone">
+                                <div class="upload-icon">
+                                    <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4m17-4l-7-7-7 7m14 0v8"/>
+                                    </svg>
+                                </div>
+                                <div class="upload-text">
+                                    <h3>Drag & drop files here</h3>
+                                    <p>or <span class="browse-link">browse to select files</span></p>
+                                </div>
+                                <div class="upload-buttons">
+                                    <button class="btn btn-green">📁 CSV Files</button>
+                                    <button class="btn btn-green">📊 Excel Files</button>
+                                </div>
+                                <p class="upload-note">Maximum file size: 250MB • Supported formats: .csv, .xlsx, .xls</p>
+                            </div>
+                        </div>
+                        
+                        <div class="right-panel">
+                            <div class="panel-card orange-gradient">
+                                <h3 class="panel-title">Upload Summary</h3>
+                                <div class="stats-grid">
+                                    <div class="stat-item">
+                                        <span class="stat-label">Total Files</span>
+                                        <span class="stat-value">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Ready</span>
+                                        <span class="stat-value">0</span>
+                                    </div>
+                                    <div class="stat-item">
+                                        <span class="stat-label">Processing</span>
+                                        <span class="stat-value">0</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="panel-card">
+                                <h3 class="panel-title">Supported Formats</h3>
+                                <div class="format-item">
+                                    <div class="format-icon csv">CSV</div>
+                                    <div>
+                                        <div style="font-weight: 500;">CSV Files</div>
+                                        <div style="font-size: 0.875rem; color: #6B7280;">Comma-separated values</div>
+                                    </div>
+                                </div>
+                                <div class="format-item">
+                                    <div class="format-icon excel">XLS</div>
+                                    <div>
+                                        <div style="font-weight: 500;">Excel (.xlsx)</div>
+                                        <div style="font-size: 0.875rem; color: #6B7280;">Microsoft Excel format</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="panel-card">
+                                <h3 class="panel-title">Quick Actions</h3>
+                                <button class="btn btn-outlined" style="width: 100%;">Download Sample CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 02. Data Exploration -->
+                <div class="page-section" id="exploration-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Data Exploration</span>
+                    </div>
+                    <h1 class="page-title">Data Exploration</h1>
+                    <p class="page-subtitle">Analyze your data structure and statistics</p>
+                    
+                    <div class="panel-card">
+                        <h3 class="panel-title">Dataset Preview</h3>
+                        <p style="color: #6B7280; margin-bottom: 1rem;">Table preview, column statistics, and data types will appear here</p>
+                        <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 2rem; text-align: center;">
+                            <svg width="48" height="48" fill="none" stroke="#D1D5DB" stroke-width="2" style="margin: 0 auto;">
+                                <rect x="4" y="4" width="40" height="32" rx="2"/>
+                                <path d="M4 12h40m-8 8h8m-8 8h8"/>
+                            </svg>
+                            <p style="margin-top: 1rem; color: #6B7280;">No data loaded yet</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 03. Visualization -->
+                <div class="page-section" id="visualization-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Visualization</span>
+                    </div>
+                    <h1 class="page-title">Data Visualization</h1>
+                    <p class="page-subtitle">Create charts and graphs from your data</p>
+                    
+                    <div class="panel-card">
+                        <h3 class="panel-title">Chart Type Selector</h3>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                            <button class="btn btn-outlined">Bar</button>
+                            <button class="btn btn-outlined">Line</button>
+                            <button class="btn btn-outlined">Scatter</button>
+                            <button class="btn btn-outlined">Pie</button>
+                            <button class="btn btn-outlined">Heatmap</button>
+                        </div>
+                        <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 3rem; text-align: center;">
+                            <svg width="48" height="48" fill="none" stroke="#D1D5DB" stroke-width="2" style="margin: 0 auto;">
+                                <path d="M4 20h6m6 0h6m6 0h6M4 12h6m6 0h6m6 0h6M4 4h6m6 0h6m6 0h6"/>
+                            </svg>
+                            <p style="margin-top: 1rem; color: #6B7280;">Select chart type to visualize data</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 04. Prediction Pipeline -->
+                <div class="page-section" id="prediction-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Prediction Pipeline</span>
+                    </div>
+                    <h1 class="page-title">Prediction Pipeline</h1>
+                    <p class="page-subtitle">Machine learning workflow steps</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div class="panel-card" style="border-left: 4px solid #F97316;">
+                            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Data Preprocessing</h4>
+                            <p style="font-size: 0.875rem; color: #6B7280;">Clean and prepare data</p>
+                        </div>
+                        <div class="panel-card">
+                            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Supervised Models</h4>
+                            <p style="font-size: 0.875rem; color: #6B7280;">Train classification/regression</p>
+                        </div>
+                        <div class="panel-card">
+                            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Unsupervised Models</h4>
+                            <p style="font-size: 0.875rem; color: #6B7280;">Clustering and dimensionality</p>
+                        </div>
+                        <div class="panel-card">
+                            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Best Model Selection</h4>
+                            <p style="font-size: 0.875rem; color: #6B7280;">Compare and choose models</p>
+                        </div>
+                        <div class="panel-card">
+                            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Prediction</h4>
+                            <p style="font-size: 0.875rem; color: #6B7280;">Make predictions</p>
+                        </div>
+                        <div class="panel-card">
+                            <h4 style="font-weight: 600; margin-bottom: 0.5rem;">Download Results</h4>
+                            <p style="font-size: 0.875rem; color: #6B7280;">Export predictions</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 05. Auto BI Dashboard -->
+                <div class="page-section" id="bi-dashboard-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Auto BI Dashboard</span>
+                    </div>
+                    <h1 class="page-title">Auto BI Dashboard</h1>
+                    <p class="page-subtitle">Business intelligence insights</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 2rem;">
+                        <div class="panel-card orange-gradient">
+                            <h3 class="panel-title" style="color: white;">Total Revenue</h3>
+                            <div class="stat-value" style="color: white;">$124,563</div>
+                        </div>
+                        <div class="panel-card">
+                            <h3 class="panel-title">Active Users</h3>
+                            <div class="stat-value">2,847</div>
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                        <div class="panel-card">
+                            <h3 class="panel-title">Sales Trend</h3>
+                            <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 2rem; text-align: center;">
+                                <svg width="48" height="48" fill="none" stroke="#D1D5DB" stroke-width="2">
+                                    <path d="M4 20h6m6 0h6m6 0h6M4 12h6m6 0h6m6 0h6M4 4h6m6 0h6m6 0h6"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <h3 class="panel-title">User Distribution</h3>
+                            <div style="background-color: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 2rem; text-align: center;">
+                                <svg width="48" height="48" fill="none" stroke="#D1D5DB" stroke-width="2">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 8v16m-8-8h16"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 06. Recommendations & Insights -->
+                <div class="page-section" id="recommendations-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Recommendations & Insights</span>
+                    </div>
+                    <h1 class="page-title">Recommendations & Insights</h1>
+                    <p class="page-subtitle">AI-powered recommendations</p>
+                    
+                    <div style="display: grid; gap: 1rem;">
+                        <div class="panel-card">
+                            <div style="display: flex; gap: 1rem;">
+                                <div style="width: 40px; height: 40px; background-color: #FED7AA; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #F97316;">
+                                    💡
+                                </div>
+                                <div>
+                                    <h4 style="font-weight: 600; margin-bottom: 0.25rem;">Data Quality Improvement</h4>
+                                    <p style="font-size: 0.875rem; color: #6B7280;">Consider removing outliers in column 'price' for better model performance</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div style="display: flex; gap: 1rem;">
+                                <div style="width: 40px; height: 40px; background-color: #FED7AA; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #F97316;">
+                                    📊
+                                </div>
+                                <div>
+                                    <h4 style="font-weight: 600; margin-bottom: 0.25rem;">Feature Engineering</h4>
+                                    <p style="font-size: 0.875rem; color: #6B7280;">Create interaction features between 'age' and 'income' for better predictions</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="panel-card">
+                            <div style="display: flex; gap: 1rem;">
+                                <div style="width: 40px; height: 40px; background-color: #FED7AA; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #F97316;">
+                                    🎯
+                                </div>
+                                <div>
+                                    <h4 style="font-weight: 600; margin-bottom: 0.25rem;">Model Selection</h4>
+                                    <p style="font-size: 0.875rem; color: #6B7280;">Random Forest shows best performance for your dataset type</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 07. Reports -->
+                <div class="page-section" id="reports-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Reports</span>
+                    </div>
+                    <h1 class="page-title">Reports</h1>
+                    <p class="page-subtitle">Generated analysis reports</p>
+                    
+                    <div class="panel-card">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid #E5E7EB;">
+                                    <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Report Name</th>
+                                    <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Type</th>
+                                    <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Status</th>
+                                    <th style="text-align: left; padding: 0.75rem; font-weight: 600;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="border-bottom: 1px solid #F3F4F6;">
+                                    <td style="padding: 0.75rem;">Q1 Sales Analysis</td>
+                                    <td style="padding: 0.75rem;">Financial</td>
+                                    <td style="padding: 0.75rem;">
+                                        <span style="background-color: #D1FAE5; color: #10B981; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Completed</span>
+                                    </td>
+                                    <td style="padding: 0.75rem;">2024-03-15</td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid #F3F4F6;">
+                                    <td style="padding: 0.75rem;">Customer Segmentation</td>
+                                    <td style="padding: 0.75rem;">ML Analysis</td>
+                                    <td style="padding: 0.75rem;">
+                                        <span style="background-color: #FEF3C7; color: #D97706; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Processing</span>
+                                    </td>
+                                    <td style="padding: 0.75rem;">2024-03-16</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.75rem;">Market Trends</td>
+                                    <td style="padding: 0.75rem;">Analytics</td>
+                                    <td style="padding: 0.75rem;">
+                                        <span style="background-color: #FEE2E2; color: #EF4444; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">Failed</span>
+                                    </td>
+                                    <td style="padding: 0.75rem;">2024-03-14</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- 08. AI Insights -->
+                <div class="page-section" id="ai-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>AI Insights</span>
+                    </div>
+                    <h1 class="page-title">AI Insights</h1>
+                    <p class="page-subtitle">Chat with AI assistant</p>
+                    
+                    <div style="max-width: 800px; margin: 0 auto;">
+                        <div class="panel-card" style="min-height: 400px;">
+                            <div style="display: flex; flex-direction: column; height: 400px;">
+                                <div style="flex: 1; padding: 1rem; overflow-y: auto;">
+                                    <div style="margin-bottom: 1rem;">
+                                        <div style="background-color: #F3F4F6; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                                            <p style="font-size: 0.875rem;">What insights can you provide about my dataset?</p>
+                                        </div>
+                                        <div style="background-color: #FED7AA; padding: 0.75rem; border-radius: 8px;">
+                                            <p style="font-size: 0.875rem;">Based on your dataset analysis, I've identified several key patterns...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="padding: 1rem; border-top: 1px solid #E5E7EB; display: flex; gap: 0.5rem;">
+                                    <input type="text" class="chat-input" placeholder="Ask me anything about your data..." style="flex: 1;">
+                                    <button class="chat-send">Send</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Profile Page -->
+                <div class="page-section" id="profile-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Profile</span>
+                    </div>
+                    <h1 class="page-title">Profile</h1>
+                    <p class="page-subtitle">Manage your account settings</p>
+                    
+                    <div class="panel-card" style="max-width: 600px;">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+                            <div class="profile-avatar" style="width: 64px; height: 64px; font-size: 1.5rem;">SS</div>
+                            <div>
+                                <h3 style="font-weight: 600;">SANGAM SINGH</h3>
+                                <p style="color: #6B7280;">sangam@example.com</p>
+                            </div>
+                        </div>
+                        
+                        <div style="display: grid; gap: 1rem;">
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Name</label>
+                                <input type="text" value="SANGAM SINGH" style="width: 100%; padding: 0.5rem; border: 1px solid #E5E7EB; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Email</label>
+                                <input type="email" value="sangam@example.com" style="width: 100%; padding: 0.5rem; border: 1px solid #E5E7EB; border-radius: 6px;">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Bio</label>
+                                <textarea style="width: 100%; padding: 0.5rem; border: 1px solid #E5E7EB; border-radius: 6px; min-height: 100px;" placeholder="Tell us about yourself..."></textarea>
+                            </div>
+                            <button class="btn btn-orange" style="margin-top: 1rem;">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings Page -->
+                <div class="page-section" id="settings-page">
+                    <div class="breadcrumb">
+                        <span>Home</span>
+                        <span>›</span>
+                        <span>Settings</span>
+                    </div>
+                    <h1 class="page-title">Settings</h1>
+                    <p class="page-subtitle">Configure your preferences</p>
+                    
+                    <div class="panel-card" style="max-width: 600px;">
+                        <div style="display: grid; gap: 1.5rem;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h4 style="font-weight: 600;">Dark Mode</h4>
+                                    <p style="font-size: 0.875rem; color: #6B7280;">Toggle dark theme</p>
+                                </div>
+                                <label style="position: relative; display: inline-block; width: 50px; height: 24px;">
+                                    <input type="checkbox" style="opacity: 0; width: 0; height: 0;">
+                                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #D1D5DB; border-radius: 24px; transition: 0.3s;"></span>
+                                    <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s;"></span>
+                                </label>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h4 style="font-weight: 600;">Email Notifications</h4>
+                                    <p style="font-size: 0.875rem; color: #6B7280;">Receive email updates</p>
+                                </div>
+                                <label style="position: relative; display: inline-block; width: 50px; height: 24px;">
+                                    <input type="checkbox" checked style="opacity: 0; width: 0; height: 0;">
+                                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #F97316; border-radius: 24px; transition: 0.3s;"></span>
+                                    <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transform: translateX(26px); transition: 0.3s;"></span>
+                                </label>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <h4 style="font-weight: 600;">Auto-process Files</h4>
+                                    <p style="font-size: 0.875rem; color: #6B7280;">Automatically process uploaded files</p>
+                                </div>
+                                <label style="position: relative; display: inline-block; width: 50px; height: 24px;">
+                                    <input type="checkbox" style="opacity: 0; width: 0; height: 0;">
+                                    <span style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #D1D5DB; border-radius: 24px; transition: 0.3s;"></span>
+                                    <span style="position: absolute; content: ''; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; border-radius: 50%; transition: 0.3s;"></span>
+                                </label>
+                            </div>
+                            
+                            <div>
+                                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Language</label>
+                                <select style="width: 100%; padding: 0.5rem; border: 1px solid #E5E7EB; border-radius: 6px;">
+                                    <option>English</option>
+                                    <option>Spanish</option>
+                                    <option>French</option>
+                                    <option>German</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- Chatbot -->
+    <div class="chatbot-fab" onclick="toggleChat()">
+        <svg width="24" height="24" fill="white" stroke="white" stroke-width="2">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"/>
+        </svg>
+    </div>
+    
+    <div class="chat-panel" id="chatPanel">
+        <div class="chat-header">AI Assistant</div>
+        <div class="chat-messages">
+            <div style="background-color: #F3F4F6; padding: 0.75rem; border-radius: 8px; margin-bottom: 0.5rem;">
+                <p style="font-size: 0.875rem;">Hello! I'm your AI assistant. How can I help you today?</p>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" placeholder="Type your message...">
+            <button class="chat-send">Send</button>
+        </div>
+    </div>
+    
+    <script>
+        function showPage(pageId) {
+            // Hide all pages
+            document.querySelectorAll('.page-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Show selected page
+            const targetPage = document.getElementById(pageId + '-page');
+            if (targetPage) {
+                targetPage.classList.add('active');
+            }
+            
+            // Update active nav item
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            
+            // Find and activate the corresponding nav item
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                if (item.onclick && item.onclick.toString().includes(pageId)) {
+                    item.classList.add('active');
+                }
+            });
+        }
+        
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('collapsed');
+        }
+        
+        function toggleChat() {
+            document.getElementById('chatPanel').classList.toggle('open');
+        }
+        
+        function toggleDarkMode() {
+            // Placeholder for dark mode functionality
+            alert('Dark mode toggle - functionality to be implemented');
+        }
+        
+        function showNotifications() {
+            // Placeholder for notifications dropdown
+            alert('Notifications dropdown - functionality to be implemented');
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            showPage('upload');
+        });
+    </script>
+</body>
+</html>

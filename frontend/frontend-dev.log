@@ -1,0 +1,4 @@
+
+> model-forge@2.0.0 predev
+> node -e "require('fs').rmSync('.next-dev', { recursive: true, force: true })"
+

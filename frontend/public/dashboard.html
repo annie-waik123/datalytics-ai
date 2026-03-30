@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Datalytics - Modern Data Analytics Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app"></div>
+    
+    <script>
+        const { useState } = React;
+        
+        function DataAnalyticsDashboard() {
+            const [expandedPrediction, setExpandedPrediction] = useState(false);
+            const [uploadedFiles, setUploadedFiles] = useState([]);
+            const [isDragging, setIsDragging] = useState(false);
+
+            const handleDragOver = (e) => {
+                e.preventDefault();
+                setIsDragging(true);
+            };
+
+            const handleDragLeave = (e) => {
+                e.preventDefault();
+                setIsDragging(false);
+            };
+
+            const handleDrop = (e) => {
+                e.preventDefault();
+                setIsDragging(false);
+                const files = Array.from(e.dataTransfer.files);
+                setUploadedFiles(prev => [...prev, ...files]);
+            };
+
+            const handleFileUpload = (e, type) => {
+                const files = Array.from(e.target.files);
+                setUploadedFiles(prev => [...prev, ...files]);
+            };
+
+            const sidebarSections = [
+                {
+                    title: 'Data Import',
+                    items: [
+                        { id: 'upload', label: 'Upload CSV/Excel', icon: '📤' },
+                        { id: 'connect', label: 'Connect Data Sources', icon: '🔗' }
+                    ]
+                },
+                {
+                    title: 'Navigation',
+                    items: [
+                        { id: 'dataset', label: '01. Dataset Upload', icon: '📁' },
+                        { id: 'exploration', label: '02. Data Exploration', icon: '🔍' },
+                        { id: 'visualization', label: '03. Visualization', icon: '📊' },
+                        { 
+                            id: 'prediction', 
+                            label: '04. Prediction', 
+                            icon: '🤖',
+                            hasSubmenu: true,
+                            submenu: [
+                                { id: 'preprocessing', label: 'Data Preprocessing' },
+                                { id: 'supervised', label: 'Supervised Models' },
+                                { id: 'unsupervised', label: 'Unsupervised Models' },
+                                { id: 'best-model', label: 'Best Model Selection' },
+                                { id: 'prediction', label: 'Prediction' },
+                                { id: 'download', label: 'Download Results' }
+                            ]
+                        },
+                        { id: 'dashboard', label: '05. Auto BI Dashboard', icon: '📈' },
+                        { id: 'recommendations', label: '06. Recommendations & Insights', icon: '💡' },
+                        { id: 'reports', label: '07. Reports', icon: '📄' },
+                        { id: 'insights', label: '08. AI Insights', icon: '🧠' }
+                    ]
+                }
+            ];
+
+            return React.createElement('div', { className: 'flex h-screen bg-gray-50 font-sans' }, [
+                // Left Sidebar
+                React.createElement('div', { className: 'w-64 bg-white border-r border-gray-200 flex flex-col' }, [
+                    // Logo
+                    React.createElement('div', { className: 'p-6 border-b border-gray-200' },
+                        React.createElement('div', { className: 'flex items-center gap-3' }, [
+                            React.createElement('div', {
+                                key: 'logo-icon',
+                                className: 'w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg'
+                            },
+                                React.createElement('svg', {
+                                    width: '24',
+                                    height: '24',
+                                    viewBox: '0 0 24 24',
+                                    fill: 'none',
+                                    className: 'text-white'
+                                }, [
+                                    React.createElement('path', {
+                                        key: 'path1',
+                                        strokeLinecap: 'round',
+                                        strokeLinejoin: 'round',
+                                        strokeWidth: '2',
+                                        d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
+                                    })
+                                ])
+                            ),
+                            React.createElement('h1', { 
+                                key: 'logo-text',
+                                className: 'text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent' 
+                            }, 'Datalytics')
+                        ])
+                    ),
+
+                    // Navigation
+                    React.createElement('div', { className: 'flex-1 overflow-y-auto p-4' },
+                        sidebarSections.map((section, sectionIdx) =>
+                            React.createElement('div', { key: sectionIdx, className: 'mb-6' }, [
+                                React.createElement('h3', { 
+                                    key: 'title',
+                                    className: 'text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3' 
+                                }, section.title),
+                                React.createElement('div', { key: 'items', className: 'space-y-1' },
+                                    section.items.map((item, itemIdx) =>
+                                        React.createElement('div', { key: itemIdx }, [
+                                            React.createElement('button', {
+                                                onClick: () => {
+                                                    if (item.hasSubmenu) {
+                                                        setExpandedPrediction(!expandedPrediction);
+                                                    }
+                                                },
+                                                className: 'w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 hover:bg-gray-100 text-gray-700'
+                                            }, [
+                                                React.createElement('span', { className: 'text-lg' }, item.icon),
+                                                React.createElement('span', { className: 'flex-1 text-left text-sm font-medium' }, item.label),
+                                                item.hasSubmenu && React.createElement('svg', {
+                                                    className: `w-4 h-4 transition-transform ${expandedPrediction ? 'rotate-90' : ''}`,
+                                                    fill: 'none',
+                                                    stroke: 'currentColor',
+                                                    viewBox: '0 0 24 24'
+                                                }, React.createElement('path', { 
+                                                    strokeLinecap: 'round',
+                                                    strokeLinejoin: 'round',
+                                                    strokeWidth: 2,
+                                                    d: 'M9 5l7 7-7 7'
+                                                }))
+                                            ]),
+
+                                            // Submenu
+                                            item.hasSubmenu && expandedPrediction && React.createElement('div', {
+                                                className: 'ml-4 mt-1 space-y-1'
+                                            }, item.submenu.map((subItem, subIdx) =>
+                                                React.createElement('button', {
+                                                    key: subIdx,
+                                                    onClick: () => {},
+                                                    className: 'w-full text-left px-3 py-2 text-sm text-gray-600 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-all duration-200'
+                                                }, subItem.label)
+                                            ))
+                                        ])
+                                    )
+                                )
+                            ])
+                        )
+                    ),
+
+                    // Bottom Actions
+                    React.createElement('div', { className: 'p-4 border-t border-gray-200 space-y-1' }, [
+                        React.createElement('button', { 
+                            className: 'w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200' 
+                        }, [
+                            React.createElement('span', null, '👤'),
+                            React.createElement('span', null, 'Profile')
+                        ]),
+                        React.createElement('button', { 
+                            className: 'w-full flex items-center gap-3 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all duration-200' 
+                        }, [
+                            React.createElement('span', null, '⚙️'),
+                            React.createElement('span', null, 'Settings')
+                        ]),
+                        React.createElement('button', { 
+                            className: 'w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200' 
+                        }, [
+                            React.createElement('span', null, '🚪'),
+                            React.createElement('span', null, 'Logout')
+                        ])
+                    ])
+                ]),
+
+                // Main Content
+                React.createElement('div', { className: 'flex-1 flex flex-col' }, [
+                    // Top Navbar
+                    React.createElement('header', { className: 'bg-white border-b border-gray-200 px-6 py-4' },
+                        React.createElement('div', { className: 'flex items-center justify-between' }, [
+                            // Search Bar
+                            React.createElement('div', { className: 'flex-1 max-w-xl' },
+                                React.createElement('div', { className: 'relative' }, [
+                                    React.createElement('input', {
+                                        type: 'text',
+                                        placeholder: 'Search anything...',
+                                        className: 'w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+                                    }),
+                                    React.createElement('svg', {
+                                        className: 'absolute left-3 top-2.5 w-5 h-5 text-gray-400',
+                                        fill: 'none',
+                                        stroke: 'currentColor',
+                                        viewBox: '0 0 24 24'
+                                    }, React.createElement('path', {
+                                        strokeLinecap: 'round',
+                                        strokeLinejoin: 'round',
+                                        strokeWidth: 2,
+                                        d: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+                                    }))
+                                ])
+                            ),
+
+                            // Right Actions
+                            React.createElement('div', { className: 'flex items-center gap-4' }, [
+                                React.createElement('button', { 
+                                    className: 'p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors' 
+                                }, React.createElement('svg', {
+                                    className: 'w-5 h-5',
+                                    fill: 'none',
+                                    stroke: 'currentColor',
+                                    viewBox: '0 0 24 24'
+                                }, React.createElement('path', {
+                                    strokeLinecap: 'round',
+                                    strokeLinejoin: 'round',
+                                    strokeWidth: 2,
+                                    d: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9'
+                                }))),
+                                React.createElement('button', { 
+                                    className: 'p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors' 
+                                }, React.createElement('svg', {
+                                    className: 'w-5 h-5',
+                                    fill: 'none',
+                                    stroke: 'currentColor',
+                                    viewBox: '0 0 24 24'
+                                }, React.createElement('path', {
+                                    strokeLinecap: 'round',
+                                    strokeLinejoin: 'round',
+                                    strokeWidth: 2,
+                                    d: 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z'
+                                }))),
+                                React.createElement('div', { className: 'flex items-center gap-3' }, [
+                                    React.createElement('span', { className: 'text-sm font-medium text-gray-700' }, 'John Doe'),
+                                    React.createElement('div', { 
+                                        className: 'w-8 h-8 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center text-white text-sm font-medium' 
+                                    }, 'JD')
+                                ])
+                            ])
+                        ])
+                    ),
+
+                    // Main Content Area
+                    React.createElement('div', { className: 'flex-1 flex' }, [
+                        React.createElement('div', { className: 'flex-1 p-6' }, [
+                            // Breadcrumb
+                            React.createElement('nav', { className: 'flex items-center gap-2 text-sm text-gray-600 mb-6' }, [
+                                React.createElement('span', null, 'Home'),
+                                React.createElement('svg', {
+                                    className: 'w-4 h-4',
+                                    fill: 'none',
+                                    stroke: 'currentColor',
+                                    viewBox: '0 0 24 24'
+                                }, React.createElement('path', {
+                                    strokeLinecap: 'round',
+                                    strokeLinejoin: 'round',
+                                    strokeWidth: 2,
+                                    d: 'M9 5l7 7-7 7'
+                                })),
+                                React.createElement('span', null, 'Upload Data')
+                            ]),
+
+                            // Title Section
+                            React.createElement('div', { className: 'mb-8' }, [
+                                React.createElement('h1', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Upload CSV & Excel Files'),
+                                React.createElement('p', { className: 'text-gray-600' }, 'Import your data files to start analyzing')
+                            ]),
+
+                            // Upload Section
+                            React.createElement('div', { className: 'mb-8' },
+                                React.createElement('div', {
+                                    className: `border-2 border-dashed rounded-xl p-12 text-center transition-all duration-200 ${
+                                        isDragging 
+                                            ? 'border-purple-500 bg-purple-50' 
+                                            : 'border-gray-300 hover:border-gray-400 bg-white'
+                                    }`,
+                                    onDragOver: handleDragOver,
+                                    onDragLeave: handleDragLeave,
+                                    onDrop: handleDrop
+                                }, React.createElement('div', { className: 'flex flex-col items-center' }, [
+                                    React.createElement('div', { 
+                                        className: 'w-16 h-16 bg-gradient-to-r from-purple-100 to-pink-100 rounded-full flex items-center justify-center mb-4' 
+                                    }, React.createElement('svg', {
+                                        className: 'w-8 h-8 text-purple-600',
+                                        fill: 'none',
+                                        stroke: 'currentColor',
+                                        viewBox: '0 0 24 24'
+                                    }, React.createElement('path', {
+                                        strokeLinecap: 'round',
+                                        strokeLinejoin: 'round',
+                                        strokeWidth: 2,
+                                        d: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12'
+                                    }))),
+                                    React.createElement('h3', { className: 'text-lg font-semibold text-gray-900 mb-2' }, 'Drag & drop files here or browse'),
+                                    
+                                    React.createElement('div', { className: 'flex gap-4 mb-4' }, [
+                                        React.createElement('label', { className: 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer font-medium' }, [
+                                            'CSV Files',
+                                            React.createElement('input', {
+                                                type: 'file',
+                                                accept: '.csv',
+                                                multiple: true,
+                                                onChange: (e) => handleFileUpload(e, 'csv'),
+                                                className: 'hidden'
+                                            })
+                                        ]),
+                                        React.createElement('label', { className: 'px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors cursor-pointer font-medium' }, [
+                                            'Excel Files',
+                                            React.createElement('input', {
+                                                type: 'file',
+                                                accept: '.xlsx,.xls',
+                                                multiple: true,
+                                                onChange: (e) => handleFileUpload(e, 'excel'),
+                                                className: 'hidden'
+                                            })
+                                        ])
+                                    ]),
+                                    
+                                    React.createElement('p', { className: 'text-sm text-gray-500' }, 
+                                        'Maximum file size: 250MB | Supported formats: .csv, .xlsx, .xls')
+                                ]))
+                            ),
+
+                            // Top Right Buttons
+                            React.createElement('div', { className: 'flex gap-4 mb-8' }, [
+                                React.createElement('button', { 
+                                    className: 'px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium' 
+                                }, 'Clear All'),
+                                React.createElement('button', { 
+                                    className: 'px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium' 
+                                }, 'Process All Files')
+                            ])
+                        ]),
+
+                        // Right Panel
+                        React.createElement('div', { className: 'w-80 p-6 space-y-6' }, [
+                            // Upload Summary Card
+                            React.createElement('div', { className: 'bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl p-6 text-white' }, [
+                                React.createElement('h3', { className: 'text-lg font-semibold mb-4' }, 'Upload Summary'),
+                                React.createElement('div', { className: 'space-y-3' }, [
+                                    React.createElement('div', { className: 'flex justify-between' }, [
+                                        React.createElement('span', { className: 'text-purple-100' }, 'Total Files'),
+                                        React.createElement('span', { className: 'font-bold text-xl' }, uploadedFiles.length)
+                                    ]),
+                                    React.createElement('div', { className: 'flex justify-between' }, [
+                                        React.createElement('span', { className: 'text-purple-100' }, 'Ready'),
+                                        React.createElement('span', { className: 'font-bold text-xl' }, uploadedFiles.length)
+                                    ]),
+                                    React.createElement('div', { className: 'flex justify-between' }, [
+                                        React.createElement('span', { className: 'text-purple-100' }, 'Processing'),
+                                        React.createElement('span', { className: 'font-bold text-xl' }, '0')
+                                    ])
+                                ])
+                            ]),
+
+                            // Supported Formats Card
+                            React.createElement('div', { className: 'bg-white rounded-xl border border-gray-200 p-6' }, [
+                                React.createElement('h3', { className: 'text-lg font-semibold mb-4 text-gray-900' }, 'Supported Formats'),
+                                React.createElement('div', { className: 'space-y-3' }, [
+                                    React.createElement('div', { className: 'flex items-center gap-3' }, [
+                                        React.createElement('div', { 
+                                            className: 'w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center' 
+                                        }, React.createElement('span', { className: 'text-green-600 font-bold' }, 'CSV')),
+                                        React.createElement('span', { className: 'text-gray-700' }, 'CSV Files')
+                                    ]),
+                                    React.createElement('div', { className: 'flex items-center gap-3' }, [
+                                        React.createElement('div', { 
+                                            className: 'w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center' 
+                                        }, React.createElement('span', { className: 'text-green-600 font-bold' }, 'XLS')),
+                                        React.createElement('span', { className: 'text-gray-700' }, 'Excel (.xlsx)')
+                                    ])
+                                ])
+                            ]),
+
+                            // Quick Actions Card
+                            React.createElement('div', { className: 'bg-white rounded-xl border border-gray-200 p-6' }, [
+                                React.createElement('h3', { className: 'text-lg font-semibold mb-4 text-gray-900' }, 'Quick Actions'),
+                                React.createElement('button', { 
+                                    className: 'w-full px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium' 
+                                }, 'Download Sample CSV')
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+
+            // Floating Chat Button
+            return React.createElement('div', null, [
+                DataAnalyticsDashboard(),
+                React.createElement('button', { 
+                    className: 'fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center text-white hover:scale-110' 
+                }, React.createElement('svg', {
+                    className: 'w-6 h-6',
+                    fill: 'none',
+                    stroke: 'currentColor',
+                    viewBox: '0 0 24 24'
+                }, React.createElement('path', {
+                    strokeLinecap: 'round',
+                    strokeLinejoin: 'round',
+                    strokeWidth: 2,
+                    d: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z'
+                })))
+            ]);
+        }
+
+        // Render the app
+        ReactDOM.render(React.createElement(DataAnalyticsDashboard), document.getElementById('app'));
+    </script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+</body>
+</html>

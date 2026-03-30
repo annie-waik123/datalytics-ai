@@ -1,0 +1,25 @@
+
+> ml-dashboard@1.0.0 dev
+> vite --host 127.0.0.1 --port 5173
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m340[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
+[2m6:54:22 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx[22m
+[2m6:54:22 pm[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/components/ExploreStep.jsx, /src/components/DownloadStep.jsx, /src/components/BestModelStep.jsx, /src/components/UnsupervisedStep.jsx, /src/components/UploadStep.jsx, /src/components/VisualizationStep.jsx, /src/components/PreprocessStep.jsx, /src/components/PredictStep.jsx, /src/components/TrainStep.jsx[22m
+[2m7:02:58 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/export/404.html[22m
+[2m7:02:58 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/export/500.html[22m
+[2m7:02:58 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/export/404.html[22m
+[2m7:02:58 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/app/app.html[22m
+[2m7:02:58 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/app/index.html[22m
+[2m7:02:58 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/app/_not-found.html[22m
+[2m7:02:59 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/pages/404.html[22m
+[2m7:02:59 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/pages/500.html[22m
+[2m7:02:59 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/export/500.html[22m
+[2m7:02:59 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/export/404.html[22m
+[2m7:03:49 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/app/app.html[22m
+[2m7:03:49 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/pages/404.html[22m
+[2m7:03:49 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/pages/500.html[22m
+[2m7:03:49 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/app/index.html[22m
+[2m7:03:49 pm[22m [36m[1m[vite][22m[39m [32mpage reload [39m[2m.next/server/app/_not-found.html[22m

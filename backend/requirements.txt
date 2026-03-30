@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pandas
+numpy
+scikit-learn
+plotly
+xgboost
+catboost
+motor
+groq
+pymongo
+python-dotenv

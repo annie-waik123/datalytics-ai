@@ -1,0 +1,31 @@
+{
+  "name": "model-forge",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "node -e \"require('fs').rmSync('.next-dev', { recursive: true, force: true })\"",
+    "dev": "next dev",
+    "prebuild": "node -e \"require('fs').rmSync('.next', { recursive: true, force: true })\"",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "axios": "^1.6.7",
+    "framer-motion": "^12.38.0",
+    "next": "^15.0.0",
+    "plotly.js-dist-min": "^3.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-plotly.js": "^2.6.0",
+    "recharts": "^2.12.2",
+    "tailwindcss": "^3.4.17",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49"
+  }
+}

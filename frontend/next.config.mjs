@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   distDir: process.env.NODE_ENV === 'development' ? '.next-dev' : '.next',
+  allowedDevOrigins: ['*.replit.dev', '*.repl.co', '*.riker.replit.dev'],
   async rewrites() {
     return [
       {

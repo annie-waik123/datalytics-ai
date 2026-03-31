@@ -9,6 +9,11 @@ import PredictionStep from './components/PredictionStep.jsx'
 import PreprocessStep from './components/PreprocessStep.jsx'
 import ModernPreprocess from './components/ModernPreprocess.jsx'
 import TrainStep from './components/TrainStep.jsx'
+import UnsupervisedStep from './components/UnsupervisedStep.jsx'
+import BestModelStep from './components/BestModelStep.jsx'
+import PredictStep from './components/PredictStep.jsx'
+import DownloadStep from './components/DownloadStep.jsx'
+import OnClickPred from './components/onclickpred.jsx'
 import PowerBIDashboardStep from './components/PowerBIDashboardStep.jsx'
 import RecommendationStep from './components/RecommendationStep.jsx'
 import ReportStep from './components/ReportStep.jsx'
@@ -74,13 +79,11 @@ function getStepLabel(step) {
   return labels[step] || 'Dashboard'
 }
 
-import OnClickPred from './components/onclickpred.jsx'
-
 export default function App() {
   const [step, setStep] = useState('upload')
   const [completedSteps, setCompletedSteps] = useState(DEFAULT_COMPLETED)
   const [dataset, setDataset] = useState(null)
-  const [predictionModule, setPredictionModule] = useState('supervised')
+  const [predictionModule, setPredictionModule] = useState('preprocessing')
   const [predictionState, setPredictionState] = useState(DEFAULT_PREDICTION_STATE)
   const [predictionStatus, setPredictionStatus] = useState({
     preprocessing_done: false,
@@ -176,6 +179,113 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const PREDICTION_MODULES = [
+    { key: 'preprocessing', label: 'Data Preprocessing', icon: '01' },
+    { key: 'supervised', label: 'Supervised Models', icon: '02' },
+    { key: 'unsupervised', label: 'Unsupervised Models', icon: '03' },
+    { key: 'best', label: 'Best Model Selection', icon: '04' },
+    { key: 'predict', label: 'Prediction', icon: '05' },
+    { key: 'download', label: 'Download Results', icon: '06' }
+  ]
+
+  const PRED_STATUS_MAP = {
+    preprocessing: 'preprocessing_done',
+    supervised: 'supervised_done',
+    unsupervised: 'unsupervised_done',
+    best: 'best_done',
+    predict: 'predict_done',
+    download: 'download_done'
+  }
+
+  function renderPredictionContent() {
+    switch (predictionModule) {
+      case 'preprocessing':
+        return (
+          <OnClickPred
+            dataset={dataset}
+            setStatus={setPredictionStatus}
+          />
+        )
+      case 'supervised':
+        return (
+          <TrainStep
+            preprocessData={predictionStatus.preprocess_data}
+            status={predictionStatus}
+            onTrained={() => setPredictionStatus(s => ({ ...s, supervised_done: true }))}
+            setStatus={setPredictionStatus}
+          />
+        )
+      case 'unsupervised':
+        return (
+          <UnsupervisedStep
+            status={predictionStatus}
+            setStatus={setPredictionStatus}
+          />
+        )
+      case 'best':
+        return (
+          <BestModelStep
+            status={predictionStatus}
+          />
+        )
+      case 'predict':
+        return (
+          <PredictStep
+            trainData={predictionStatus.preprocess_data}
+            status={predictionStatus}
+            setStatus={setPredictionStatus}
+          />
+        )
+      case 'download':
+        return (
+          <DownloadStep
+            trainData={predictionStatus.preprocess_data}
+            preprocessData={predictionStatus.preprocess_data}
+            status={predictionStatus}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
+  function renderPrediction() {
+    return (
+      <div className="prediction-layout">
+        <div className="prediction-subnav">
+          <div className="prediction-subnav-header">
+            <span className="prediction-subnav-title">Prediction</span>
+            <span className="prediction-subnav-sub">ML Pipeline</span>
+          </div>
+          <nav className="prediction-subnav-list">
+            {PREDICTION_MODULES.map((mod, idx) => {
+              const isActive = predictionModule === mod.key
+              const isDone = predictionStatus[PRED_STATUS_MAP[mod.key]]
+              return (
+                <button
+                  key={mod.key}
+                  type="button"
+                  className={`pred-subnav-item${isActive ? ' is-active' : ''}${isDone ? ' is-done' : ''}`}
+                  onClick={() => {
+                    setPredictionModule(mod.key)
+                    setPredictionStatus(s => ({ ...s, current_module: mod.key }))
+                  }}
+                >
+                  <span className="pred-subnav-step">{mod.icon}</span>
+                  <span className="pred-subnav-label">{mod.label}</span>
+                  {isDone && <span className="pred-subnav-done-dot" />}
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+        <div className="prediction-content">
+          {renderPredictionContent()}
+        </div>
+      </div>
+    )
+  }
+
   function renderStep() {
     switch (step) {
       case 'upload':
@@ -210,24 +320,7 @@ export default function App() {
           />
         )
       case 'prediction':
-        if (predictionStatus.current_module === 'supervised' || predictionModule === 'supervised') {
-          return (
-            <TrainStep
-              preprocessData={predictionStatus.preprocess_data}
-              status={predictionStatus}
-              onTrained={(data) => {
-                setPredictionStatus(s => ({ ...s, supervised_done: true }));
-              }}
-              setStatus={setPredictionStatus}
-            />
-          )
-        }
-        return (
-          <OnClickPred
-            dataset={dataset}
-            setStatus={setPredictionStatus}
-          />
-        )
+        return renderPrediction()
       case 'powerbi':
         return (
           <PowerBIDashboardStep

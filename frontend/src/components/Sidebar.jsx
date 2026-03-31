@@ -1,23 +1,9 @@
-import { useEffect, useState } from 'react'
 
 const NAV_ITEMS = [
   { key: 'upload', label: 'Dataset Upload', icon: '01', meta: 'Upload CSV / Excel' },
   { key: 'exploration', label: 'Data Exploration', icon: '02', meta: 'Statistics and profiling' },
   { key: 'visualization', label: 'Visualization', icon: '03', meta: 'Charts and filters' },
-  {
-    key: 'prediction',
-    label: 'Prediction',
-    icon: '04',
-    meta: 'Model training and forecasts',
-    children: [
-      { key: 'preprocessing', label: 'Data Preprocessing' },
-      { key: 'supervised', label: 'Supervised Models' },
-      { key: 'unsupervised', label: 'Unsupervised Models' },
-      { key: 'best', label: 'Best Model Selection' },
-      { key: 'predict', label: 'Prediction' },
-      { key: 'download', label: 'Download Results' }
-    ]
-  },
+  { key: 'prediction', label: 'Prediction', icon: '04', meta: 'Model training and forecasts' },
   { key: 'powerbi', label: 'Auto Power BI Dashboard', icon: '05', meta: 'Interactive dashboard' },
   { key: 'recommendations', label: 'Recommendations & Insights', icon: '06', meta: 'AI insights' },
   { key: 'reports', label: 'Reports', icon: '07', meta: 'Export PDF' },
@@ -48,14 +34,6 @@ export default function Sidebar({
   onToggleCollapse,
   onCloseMobile
 }) {
-  const [predictionOpen, setPredictionOpen] = useState(true)
-
-  useEffect(() => {
-    if (currentStep === 'prediction') {
-      setPredictionOpen(true)
-    }
-  }, [currentStep])
-
   const compact = collapsed && !mobileOpen
   const safeCompletedSteps = completedSteps || {}
   const totalSteps = Object.keys(safeCompletedSteps).length || 8
@@ -172,59 +150,7 @@ export default function Sidebar({
                       <span className="sidebar-step-meta">{item.meta}</span>
                     </span>
                   )}
-                  {item.children && !compact && (
-                    <span
-                      className="sidebar-step-toggle"
-                      onClick={event => {
-                        event.stopPropagation()
-                        setPredictionOpen(open => !open)
-                      }}
-                      role="button"
-                    >
-                      {predictionOpen ? '-' : '+'}
-                    </span>
-                  )}
                 </button>
-
-                {item.children && predictionOpen && !compact && (
-                  <div className="sidebar-substeps">
-                    {item.children.map(child => {
-                      const activeSub = currentStep === 'prediction' && predictionModule === child.key
-                      
-                      // Map child keys to predictionStatus keys
-                      const statusKeyMap = {
-                        preprocessing: 'preprocessing_done',
-                        supervised: 'supervised_done',
-                        unsupervised: 'unsupervised_done',
-                        best: 'best_done',
-                        predict: 'predict_done',
-                        download: 'download_done'
-                      }
-                      
-                      const isDone = predictionStatus[statusKeyMap[child.key]]
-                      const subStatus = activeSub ? 'ACTIVE' : (isDone ? 'COMPLETED' : 'READY')
-                      
-                      return (
-                        <button
-                          key={child.key}
-                          type="button"
-                          className={`sidebar-substep ${activeSub ? 'is-active' : ''} ${isDone ? 'is-done' : ''}`}
-                          onClick={() => {
-                            setStep('prediction')
-                            setPredictionModule(child.key)
-                            if (predictionStatus.setStatus) {
-                              predictionStatus.setStatus(s => ({ ...s, current_module: child.key }));
-                            }
-                            onCloseMobile()
-                          }}
-                        >
-                          <span className="sidebar-substep-dot" />
-                          <span className="sidebar-substep-label">{child.label}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
               </div>
             )
           })}

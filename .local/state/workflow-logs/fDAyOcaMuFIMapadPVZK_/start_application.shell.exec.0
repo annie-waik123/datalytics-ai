@@ -1,0 +1,22 @@
+
+> model-forge@2.0.0 predev
+> node -e "require('fs').rmSync('.next-dev', { recursive: true, force: true })"
+
+[1G[0K[1G[0K⠙[1G[0K
+> model-forge@2.0.0 dev
+> next dev -p 5000 -H 0.0.0.0
+
+[1G[0K⠙[1G[0K   [1m[38;2;173;127;168m▲ Next.js 15.5.14[39m[22m
+   - Local:        http://localhost:5000
+   - Network:      http://0.0.0.0:5000
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1691ms
+ [37m[1m○[22m[39m Compiling / ...
+ [32m[1m✓[22m[39m Compiled / in 6s (601 modules)
+ [32m[1m✓[22m[39m Compiled in 262ms (238 modules)
+ GET / [32m200[39m in 6823ms
+ [37m[1m○[22m[39m Compiling /icon.svg ...
+ [32m[1m✓[22m[39m Compiled /icon.svg in 753ms (353 modules)
+ GET /icon.svg?b9898f83bea6860a [32m200[39m in 776ms
+ [32m[1m✓[22m[39m Compiled in 488ms (238 modules)

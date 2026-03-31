@@ -167,13 +167,10 @@ export default function Sidebar({
                     <span className="sidebar-step-icon">{item.icon}</span>
                   </span>
                   {!compact && (
-                    <>
-                      <span className="sidebar-step-copy">
-                        <span className="sidebar-step-label">{item.label}</span>
-                        <span className="sidebar-step-meta">{item.meta}</span>
-                      </span>
-                      <span className="sidebar-step-state">{status}</span>
-                    </>
+                    <span className="sidebar-step-copy">
+                      <span className="sidebar-step-label">{item.label}</span>
+                      <span className="sidebar-step-meta">{item.meta}</span>
+                    </span>
                   )}
                   {item.children && !compact && (
                     <span
@@ -223,12 +220,6 @@ export default function Sidebar({
                         >
                           <span className="sidebar-substep-dot" />
                           <span className="sidebar-substep-label">{child.label}</span>
-                          <span className="sidebar-substep-status" style={{ 
-                            fontSize: '0.6rem', 
-                            color: activeSub ? '#ff6a00' : (isDone ? '#4ade80' : 'rgba(255,255,255,0.3)') 
-                          }}>
-                            {subStatus}
-                          </span>
                         </button>
                       )
                     })}

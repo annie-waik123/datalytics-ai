@@ -176,31 +176,6 @@ export default function UploadStep({ dataset, datasetProfile, onDatasetChange, o
           )}
         </div>
 
-        <div className="upload-features">
-          <div className="feature-card">
-            <div className="feature-icon">🔍</div>
-            <h3>Auto Data Profiling</h3>
-            <p>Automatic detection of data types, missing values, and quality metrics</p>
-          </div>
-          
-          <div className="feature-card">
-            <div className="feature-icon">🧹</div>
-            <h3>Smart Cleaning</h3>
-            <p>Intelligent data cleaning with imputation and duplicate removal</p>
-          </div>
-          
-          <div className="feature-card">
-            <div className="feature-icon">📊</div>
-            <h3>Instant Visualizations</h3>
-            <p>Generate charts and insights automatically from your data</p>
-          </div>
-          
-          <div className="feature-card">
-            <div className="feature-icon">🤖</div>
-            <h3>AI-Powered Insights</h3>
-            <p>Get intelligent recommendations and analysis from Groq AI</p>
-          </div>
-        </div>
       </div>
 
       {dataset && (

@@ -36,7 +36,7 @@
   --radius-xs: 8px;
   --sidebar-w: 280px;
   --sidebar-collapsed: 80px;
-  --topbar-h: 70px;
+  --topbar-h: 52px;
   --transition-fast: 0.15s ease;
   --transition-base: 0.25s ease;
   --transition-slow: 0.4s ease;
@@ -227,7 +227,7 @@
 }
 
 .app-topbar {
-  padding: 1rem 2rem !important;
+  padding: 0 1.5rem !important;
   min-height: var(--topbar-h) !important;
   background: var(--bg-elevated) !important;
   border-bottom: 1px solid var(--border) !important;
@@ -1777,7 +1777,7 @@ code {
   justify-content: space-between;
   gap: 1rem;
   min-height: var(--topbar-h);
-  padding: 1rem 2.5rem;
+  padding: 0 1.5rem;
   background: rgba(10, 14, 24, 0.72);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   backdrop-filter: blur(20px);

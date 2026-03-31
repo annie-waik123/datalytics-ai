@@ -361,18 +361,6 @@ export default function App() {
               </button>
             </div>
             
-            <div className="topbar-progress">
-              <div className="topbar-progress-label">Progress</div>
-              <div className="topbar-progress-value">{completedCount}/{totalSteps} steps</div>
-            </div>
-            
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={handleResetWorkflow}
-            >
-              Reset Workflow
-            </button>
           </div>
         </header>
 

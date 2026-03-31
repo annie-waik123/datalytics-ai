@@ -14,6 +14,229 @@ function normalizeDataset(payload) {
   }
 }
 
+function DatasetPreview({ dataset }) {
+  const meta = dataset.meta || {}
+  const rows = meta.preview || dataset.rows || []
+  const columns = meta.all_columns || dataset.columns || []
+  const columnsInfo = meta.columns_info || []
+  const totalRows = meta.rows || rows.length
+  const totalCols = meta.cols || columns.length
+  const numericCols = meta.numeric_cols ?? '—'
+  const categoricalCols = meta.categorical_cols ?? '—'
+  const missingTotal = meta.missing_total ?? '—'
+
+  const dtypeColor = dtype => {
+    if (!dtype) return { bg: 'rgba(148,163,184,0.12)', text: '#94a3b8' }
+    if (dtype.includes('int') || dtype.includes('float')) return { bg: 'rgba(99,102,241,0.12)', text: '#818cf8' }
+    if (dtype.includes('object') || dtype.includes('str')) return { bg: 'rgba(34,197,94,0.12)', text: '#4ade80' }
+    if (dtype.includes('bool')) return { bg: 'rgba(245,158,11,0.12)', text: '#fbbf24' }
+    if (dtype.includes('date') || dtype.includes('time')) return { bg: 'rgba(0,212,255,0.12)', text: '#22d3ee' }
+    return { bg: 'rgba(148,163,184,0.12)', text: '#94a3b8' }
+  }
+
+  const statCard = (label, value, color) => (
+    <div key={label} style={{
+      flex: 1, minWidth: 0, padding: '14px 16px', borderRadius: 10,
+      background: 'var(--bg-glass)', border: '1px solid var(--border)',
+      display: 'flex', flexDirection: 'column', gap: 4
+    }}>
+      <span style={{ fontSize: '1.3rem', fontWeight: 700, color: color || 'var(--text-primary)' }}>
+        {typeof value === 'number' ? value.toLocaleString() : value}
+      </span>
+      <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 500 }}>{label}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18,
+        padding: '12px 18px', borderRadius: 10,
+        background: 'linear-gradient(135deg, rgba(255,106,0,0.12), rgba(255,77,46,0.08))',
+        border: '1px solid rgba(255,106,0,0.2)'
+      }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          background: 'linear-gradient(135deg, #ff6a00, #ff4d2e)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <polyline points="10 9 9 9 8 9"/>
+          </svg>
+        </div>
+        <div>
+          <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+            {dataset.name}
+          </p>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+            Dataset loaded successfully
+          </p>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            padding: '3px 10px', borderRadius: 20, fontSize: '0.72rem', fontWeight: 600,
+            background: 'rgba(34,197,94,0.15)', color: '#4ade80', border: '1px solid rgba(34,197,94,0.25)'
+          }}>✓ Ready</span>
+        </div>
+      </div>
+
+      {/* Stats row */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        {statCard('Total Rows', totalRows, '#ff6a00')}
+        {statCard('Columns', totalCols, '#818cf8')}
+        {statCard('Numeric', numericCols, '#22d3ee')}
+        {statCard('Categorical', categoricalCols, '#4ade80')}
+        {statCard('Missing Values', missingTotal, missingTotal > 0 ? '#f87171' : '#4ade80')}
+      </div>
+
+      {/* Column overview */}
+      {columnsInfo.length > 0 && (
+        <div style={{
+          marginBottom: 20, background: 'var(--bg-panel)', border: '1px solid var(--border)',
+          borderRadius: 12, overflow: 'hidden'
+        }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+              Column Overview
+            </span>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 8 }}>
+              {columnsInfo.length} columns
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              <thead>
+                <tr style={{ background: 'var(--bg-glass)' }}>
+                  {['Column', 'Type', 'Non-Null', 'Null %', 'Unique'].map(h => (
+                    <th key={h} style={{
+                      padding: '8px 14px', textAlign: 'left', fontWeight: 600,
+                      color: 'var(--text-muted)', fontSize: '0.72rem', letterSpacing: '0.04em',
+                      borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap'
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {columnsInfo.map((col, i) => {
+                  const { bg, text } = dtypeColor(col.dtype)
+                  return (
+                    <tr key={col.column} style={{
+                      borderBottom: i < columnsInfo.length - 1 ? '1px solid var(--border-light)' : 'none',
+                      transition: 'background 0.15s'
+                    }}>
+                      <td style={{ padding: '8px 14px', color: 'var(--text-primary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                        {col.column}
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 20, fontSize: '0.7rem', fontWeight: 600,
+                          background: bg, color: text
+                        }}>{col.dtype}</span>
+                      </td>
+                      <td style={{ padding: '8px 14px', color: 'var(--text-secondary)' }}>
+                        {col.non_null?.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '8px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            flex: 1, maxWidth: 60, height: 4, borderRadius: 2,
+                            background: 'var(--border)'
+                          }}>
+                            <div style={{
+                              width: `${Math.min(col.null_pct || 0, 100)}%`, height: '100%',
+                              borderRadius: 2,
+                              background: (col.null_pct || 0) > 10 ? '#f87171' : '#4ade80'
+                            }} />
+                          </div>
+                          <span style={{ color: (col.null_pct || 0) > 10 ? '#f87171' : 'var(--text-muted)', fontSize: '0.72rem' }}>
+                            {col.null_pct ?? 0}%
+                          </span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '8px 14px', color: 'var(--text-secondary)' }}>
+                        {col.unique?.toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Data preview table */}
+      {rows.length > 0 && (
+        <div style={{
+          background: 'var(--bg-panel)', border: '1px solid var(--border)',
+          borderRadius: 12, overflow: 'hidden'
+        }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <span style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                Data Preview
+              </span>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginLeft: 8 }}>
+                Showing first {rows.length} rows
+              </span>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+              {columns.length} columns
+            </span>
+          </div>
+          <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: 340 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
+              <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <tr style={{ background: 'var(--bg-elevated)' }}>
+                  <th style={{
+                    padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-muted)',
+                    fontSize: '0.7rem', borderBottom: '1px solid var(--border)', width: 40
+                  }}>#</th>
+                  {columns.map(col => (
+                    <th key={col} style={{
+                      padding: '8px 14px', textAlign: 'left', fontWeight: 600,
+                      color: 'var(--text-secondary)', fontSize: '0.73rem',
+                      borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap'
+                    }}>{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, i) => (
+                  <tr key={i} style={{
+                    borderBottom: i < rows.length - 1 ? '1px solid var(--border-light)' : 'none',
+                    background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)'
+                  }}>
+                    <td style={{
+                      padding: '7px 12px', textAlign: 'center', color: 'var(--text-muted)',
+                      fontSize: '0.7rem', fontWeight: 500
+                    }}>{i + 1}</td>
+                    {columns.map(col => (
+                      <td key={col} style={{
+                        padding: '7px 14px', color: 'var(--text-secondary)',
+                        whiteSpace: 'nowrap', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis'
+                      }}>
+                        {row[col] == null || row[col] === '' ? (
+                          <span style={{ color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.7rem' }}>null</span>
+                        ) : String(row[col])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function UploadStep({ dataset, datasetProfile, onDatasetChange, onComplete }) {
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -370,26 +593,7 @@ export default function UploadStep({ dataset, datasetProfile, onDatasetChange, o
       </div>
 
       {/* Dataset preview after upload */}
-      {dataset && (
-        <div style={{ marginTop: 20, ...card }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-            <span style={{ fontSize: '1.1rem' }}>✅</span>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '0.92rem', fontWeight: 600, color: 'var(--text-primary)' }}>
-                Dataset Loaded Successfully
-              </h3>
-              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                {dataset.name} &bull; {dataset.rows?.length || 0} rows &bull; {dataset.columns?.length || 0} columns
-              </p>
-            </div>
-          </div>
-          <DataTable
-            data={dataset.rows?.slice(0, 5) || []}
-            columns={dataset.columns || []}
-            compact
-          />
-        </div>
-      )}
+      {dataset && <DatasetPreview dataset={dataset} />}
     </div>
   )
 }

@@ -13,7 +13,8 @@ from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 load_dotenv()
 
-from routers import data, upload, preprocess, train, predict
+from routers import data, upload, preprocess, train, predict, eda
+# from routers import auth
 from routers import chatbot, recommendations, reports
 from database import ping_db
 
@@ -73,7 +74,9 @@ async def session_middleware(request: Request, call_next):
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(upload.router,          prefix="/api", tags=["Upload"])
+# app.include_router(auth.router,            prefix="/api", tags=["Auth"])
 app.include_router(data.router,            prefix="/api", tags=["Data"])
+app.include_router(eda.router,             prefix="/api", tags=["EDA"])
 app.include_router(preprocess.router,      prefix="/api", tags=["Preprocess"])
 app.include_router(train.router,           prefix="/api", tags=["Train"])
 app.include_router(predict.router,         prefix="/api", tags=["Predict"])

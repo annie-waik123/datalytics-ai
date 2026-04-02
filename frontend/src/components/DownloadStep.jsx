@@ -1,6 +1,8 @@
 import client from '../api/client.js'
+import { useToast } from '../hooks/useToast.js'
 
-export default function DownloadStep({ trainData, preprocessData, status }) {
+export default function DownloadStep({ trainData, preprocessData, status, setStatus }) {
+  const { addToast } = useToast()
   const hasModel = Boolean(trainData?.best_model_name || status.best_model_name)
   const hasProcessed = Boolean(preprocessData || status.preprocessing_done)
   const hasResults = Boolean(status.supervised_done)
@@ -17,8 +19,12 @@ export default function DownloadStep({ trainData, preprocessData, status }) {
       link.download = filename
       link.click()
       URL.revokeObjectURL(url)
+      if (setStatus) {
+        setStatus((prev) => ({ ...prev, download_done: true }))
+      }
     } catch (e) {
-      alert('Download failed: ' + (e.response?.data?.detail || e.message))
+      const message = e.response?.data?.detail || e.message || 'Download failed.'
+      addToast(`Download failed: ${message}`, () => download(endpoint, filename), 'error')
     }
   }
 

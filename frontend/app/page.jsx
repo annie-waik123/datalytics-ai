@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import AnalyticsPipelineStepper from "../src/components/AnalyticsPipelineStepper.jsx";
+// import { useAuth } from "../src/auth/AuthContext.jsx";
+// import AuthModal from "../src/components/auth/AuthModal.jsx";
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
@@ -385,7 +389,7 @@ const styles = `
 
 // ── Sub-components ──────────────────────────────────────────
 
-function Navbar({ scrolled }) {
+function Navbar({ scrolled, onLaunch, onLogin }) {
   return (
     <nav className="mm-nav" style={scrolled ? { background: 'rgba(6,10,24,0.95)', boxShadow: '0 4px 30px rgba(0,0,0,0.4)' } : {}}>
       <a href="#" className="logo">
@@ -400,8 +404,8 @@ function Navbar({ scrolled }) {
         ))}
       </ul>
       <div className="nav-actions">
-        <button className="btn-login">Login</button>
-        <button className="btn-signup" onClick={() => window.location.href='/app'}>Launch App</button>
+        <button className="btn-login" onClick={onLogin}>Login</button>
+        <button className="btn-signup" onClick={onLaunch}>Launch App 🚀</button>
       </div>
     </nav>
   );
@@ -565,12 +569,17 @@ function useSteps() {
 
 // ── MAIN COMPONENT ──────────────────────────────────────────
 export default function Datalytics() {
+  const router = useRouter();
+  // const { isAuthenticated, isVerified } = useAuth();
   const [scrolled, setScrolled] = useState(false);
   const [tickerPrice, setTickerPrice] = useState('43,210');
   const [tickerChg, setTickerChg] = useState('+2.34%');
   const [miniBarHeights, setMiniBarHeights] = useState([30,55,70,45,80,60,90]);
   const [nlEmail, setNlEmail] = useState('');
   const [nlDone, setNlDone] = useState(false);
+  const [isLaunching, setIsLaunching] = useState(false);
+  // const [authModalOpen, setAuthModalOpen] = useState(false);
+  // const [initialAuthView, setInitialAuthView] = useState('signup');
   const [volumeVal, setVolumeVal] = useState('1.3B');
   const tickerBase = useRef(43210);
   const volBase = useRef(1.3);
@@ -583,6 +592,27 @@ export default function Datalytics() {
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
+
+  // useEffect(() => {
+  //   const params = new URLSearchParams(window.location.search);
+  //   const authView = params.get('auth');
+  //   if (!authView) return;
+  //
+  //   const allowedViews = ['login', 'signup', 'forgot', 'otp'];
+  //   setInitialAuthView(allowedViews.includes(authView) ? authView : 'signup');
+  //   setAuthModalOpen(true);
+  // }, []);
+
+  useEffect(() => {
+    if (!isLaunching) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isLaunching]);
 
   // Ticker live update
   useEffect(() => {
@@ -638,6 +668,14 @@ export default function Datalytics() {
     }
   };
 
+  const handleLaunchApp = () => {
+    setIsLaunching(true);
+  };
+
+  const handleLoginOpen = () => {
+    setIsLaunching(true);
+  };
+
   const features = [
     { icon: '📁', cls: 'fi-red', title: 'Smart Upload', desc: 'Easily import CSV, Excel, and JSON datasets with automated schema detection and validation.' },
     { icon: '📊', cls: 'fi-cyan', title: 'Live Analytics', desc: 'Visualize your data performance with AI-powered charts, trends and predictive insights in real time.' },
@@ -678,6 +716,18 @@ export default function Datalytics() {
 
   return (
     <div className="mm-wrap">
+      {/* Authentication modal disabled for now. */}
+
+      {isLaunching ? (
+        <div className="fixed inset-0 z-[200]">
+          <AnalyticsPipelineStepper
+            theme="dark"
+            stepDuration={1250}
+            onComplete={() => router.push('/app')}
+          />
+        </div>
+      ) : null}
+
       <style>{styles}</style>
 
       {/* BG */}
@@ -687,7 +737,7 @@ export default function Datalytics() {
       </div>
       <div className="grid-bg"/>
 
-      <Navbar scrolled={scrolled} />
+      <Navbar scrolled={scrolled} onLaunch={handleLaunchApp} onLogin={handleLoginOpen} />
 
       {/* HERO */}
       <section className="hero" id="hero">
@@ -696,7 +746,7 @@ export default function Datalytics() {
           <h1 className="hero-h1">The new era of<br /><span className="accent">data</span><br />insights.</h1>
           <p className="hero-sub">Unlocking the power of AI-driven data insights.</p>
           <div className="hero-btns">
-            <button className="btn-primary" onClick={() => window.location.href='/app'}>Try it free</button>
+            <button className="btn-primary" onClick={handleLaunchApp}>Launch App 🚀</button>
             <button className="btn-secondary">
               <span className="play-icon">▶</span>
               Show me the demo
@@ -929,7 +979,7 @@ export default function Datalytics() {
           <h2 className="cta-title">Ready to take control of<br />your <span>data future?</span></h2>
           <p className="cta-desc">Join over 2 million users who have already transformed the way they manage data. Get started free — no credit card required.</p>
           <div className="cta-btns">
-            <button className="btn-primary" style={{ padding: '16px 40px', fontSize: '1rem' }} onClick={() => window.location.href='/app'}>🚀 Start for Free</button>
+            <button className="btn-primary" style={{ padding: '16px 40px', fontSize: '1rem' }} onClick={handleLaunchApp}>Launch App 🚀</button>
             <button className="btn-secondary" style={{ padding: '15px 32px', fontSize: '1rem' }}>Schedule a Demo</button>
           </div>
           <p className="cta-note">✓ No credit card required &nbsp;&nbsp; ✓ Setup in under 5 minutes &nbsp;&nbsp; ✓ Cancel anytime</p>
@@ -992,3 +1042,4 @@ export default function Datalytics() {
     </div>
   );
 }
+

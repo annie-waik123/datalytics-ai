@@ -4,10 +4,16 @@ python-multipart
 pandas
 numpy
 scikit-learn
+openpyxl
 plotly
+matplotlib
+seaborn
 xgboost
 catboost
 motor
 groq
 pymongo
 python-dotenv
+dask[dataframe]
+redis
+celery

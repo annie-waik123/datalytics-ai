@@ -7,6 +7,6 @@ export default defineConfig({
     port: 5173,
   },
   optimizeDeps: {
-    include: ['plotly.js-dist-min'],
+    include: ['plotly.js-dist-min', 'chart.js', 'papaparse', 'xlsx', 'jspdf'],
   },
 })

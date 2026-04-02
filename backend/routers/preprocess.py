@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 
 from models.schemas import PreprocessRequest
-from services.ml_service import preprocess
+from services.ml_service import preprocess, sanitize_for_json
 from state.session_store import store
 
 router = APIRouter()
@@ -38,8 +38,11 @@ async def _run_preprocess(
         raise HTTPException(status_code=422, detail=f"Preprocessing failed: {e}")
 
     # Store in session
-    session.target_col = body.target_col
-    session.task_type = body.task_type
+    resolved_target_col = result.get("target_col", body.target_col)
+    resolved_task_type = result.get("task_type", body.task_type)
+
+    session.target_col = resolved_target_col
+    session.task_type = resolved_task_type
     session.df_processed = result["df_processed"]
     session.feature_columns = result["feature_columns"]
     session.X_train = result["X_train"]
@@ -70,7 +73,7 @@ async def _run_preprocess(
     prev_df = result["df_processed"].head(10).copy()
     for col in prev_df.select_dtypes(include="category").columns:
         prev_df[col] = prev_df[col].astype(str)
-    processed_preview = prev_df.where(pd.notnull(prev_df), None).to_dict(orient="records")
+    processed_preview = sanitize_for_json(prev_df.where(pd.notnull(prev_df), None).to_dict(orient="records"))
 
     return JSONResponse({
         "total_size": len(result["df_processed"]),
@@ -81,8 +84,8 @@ async def _run_preprocess(
         "sample_size": result["sample_size"],
         "processed_preview": processed_preview,
         "encoding_warnings": result["encoding_warnings"],
-        "target_col": body.target_col,
-        "task_type": body.task_type,
+        "target_col": resolved_target_col,
+        "task_type": resolved_task_type,
         "large_dataset_mode": result["large_dataset_mode"],
     })
 
@@ -114,7 +117,7 @@ async def preprocess_summary(
     prev_df = session.df_processed.head(10).copy()
     for col in prev_df.select_dtypes(include="category").columns:
         prev_df[col] = prev_df[col].astype(str)
-    processed_preview = prev_df.where(pd.notnull(prev_df), None).to_dict(orient="records")
+    processed_preview = sanitize_for_json(prev_df.where(pd.notnull(prev_df), None).to_dict(orient="records"))
 
     return JSONResponse({
         "total_size": len(session.df_processed),

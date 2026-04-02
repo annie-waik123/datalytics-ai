@@ -1,5 +1,6 @@
 import { Inter, JetBrains_Mono, Poppins } from 'next/font/google'
 import './globals.css'
+import Providers from './providers.jsx'
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -59,7 +60,7 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-[#020010] font-[family:var(--font-body)] text-white antialiased">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )

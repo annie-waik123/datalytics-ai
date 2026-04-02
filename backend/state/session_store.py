@@ -10,6 +10,16 @@ from typing import Any, Optional
 
 @dataclass
 class SessionData:
+    dataset_name: Optional[str] = None
+    dataset_path: Optional[str] = None
+    dataset_format: Optional[str] = None
+    dataset_storage_mode: str = "memory"
+    dataset_file_size: int = 0
+    dataset_row_count: int = 0
+    dataset_column_count: int = 0
+    dataset_columns: list[str] = field(default_factory=list)
+    dataset_snapshot: dict = field(default_factory=dict)
+    df_original: Any = None
     df: Any = None
     df_processed: Any = None
     target_col: Optional[str] = None
@@ -30,6 +40,7 @@ class SessionData:
     preprocess_meta: dict = field(default_factory=dict)
     training_meta: dict = field(default_factory=dict)
     cluster_meta: dict = field(default_factory=dict)
+    dashboard_builder: dict = field(default_factory=dict)
     preprocessing_done: bool = False
     supervised_done: bool = False
     unsupervised_done: bool = False

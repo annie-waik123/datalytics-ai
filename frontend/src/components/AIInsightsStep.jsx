@@ -1,24 +1,25 @@
-import { useMemo, useState } from 'react'
-import { formatNumber } from '../lib/dataUtils.js'
+import { useMemo, useRef, useState } from 'react'
+import { buildDatasetSummary } from '../lib/dataUtils.js'
+import { DEFAULT_DATASET_INTELLIGENCE_PROMPT } from '../utils/aiIntelligence.js'
+import { chatWithGroq } from '../utils/groq.js'
+import { useToast } from '../hooks/useToast.js'
 
-function getTopCorrelation(datasetProfile) {
-  if (!datasetProfile) return null
-  const salesIndex = datasetProfile.numericColumns.findIndex(col => /sales/i.test(col))
-  if (salesIndex === -1) return null
-  const correlations = datasetProfile.correlation[salesIndex]
-  let best = { col: null, value: 0 }
-  correlations.forEach((value, idx) => {
-    if (idx === salesIndex) return
-    if (Math.abs(value) > Math.abs(best.value)) {
-      best = { col: datasetProfile.numericColumns[idx], value }
-    }
-  })
-  return best.col ? best : null
-}
+const QUICK_QUESTIONS = [
+  'Give me complete recommendations and insights for this dataset.',
+  DEFAULT_DATASET_INTELLIGENCE_PROMPT,
+  'Predict churn risk',
+  'Summarize the data',
+  'Find anomalies and root causes',
+]
 
 export default function AIInsightsStep({ dataset, datasetProfile, onComplete, onJumpToUpload }) {
-  const [question, setQuestion] = useState('')
-  const [history, setHistory] = useState([])
+  const { addToast } = useToast()
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [streamingText, setStreamingText] = useState('')
+  const [statusMessage, setStatusMessage] = useState('')
+  const lastQuestionRef = useRef('')
 
   if (!dataset || !datasetProfile) {
     return (
@@ -30,118 +31,142 @@ export default function AIInsightsStep({ dataset, datasetProfile, onComplete, on
     )
   }
 
-  const topCorrelation = useMemo(() => getTopCorrelation(datasetProfile), [datasetProfile])
+  const datasetSummary = useMemo(
+    () => buildDatasetSummary(dataset, datasetProfile),
+    [dataset, datasetProfile]
+  )
 
-  function answerQuestion(query) {
-    const text = query.toLowerCase()
-    if (text.includes('sales') && text.includes('affect')) {
-      return topCorrelation
-        ? `${topCorrelation.col} has the strongest correlation with Sales (${topCorrelation.value.toFixed(2)}).`
-        : 'Profit and discount levels are the most likely drivers based on current signals.'
+  async function handleSend(question) {
+    const query = question || input.trim()
+    if (!query || loading) return
+    lastQuestionRef.current = query
+    setInput('')
+    setStatusMessage('')
+    setMessages((prev) => [...prev, { role: 'user', content: query }])
+    setLoading(true)
+    setStreamingText('')
+
+    const groqMessages = [
+      {
+        role: 'system',
+        content: `You are a data analyst. Use the dataset summary to answer questions clearly and concisely. Dataset summary: ${JSON.stringify(datasetSummary)}`,
+      },
+      ...messages,
+      { role: 'user', content: query },
+    ]
+
+    try {
+      const response = await chatWithGroq(groqMessages, datasetSummary)
+      setStatusMessage(response.notice || '')
+      await streamResponse(response.content)
+      onComplete('aiInsights')
+    } catch (err) {
+      const message = 'AI insights are temporarily unavailable. Please retry.'
+      addToast(message, () => handleSend(lastQuestionRef.current), 'error')
+    } finally {
+      setLoading(false)
     }
-    if (text.includes('trend')) {
-      return 'Recent months show steady growth with a slight dip in the last period. Consider stabilizing promotions.'
-    }
-    if (text.includes('missing')) {
-      const missingPct = datasetProfile.rowCount && datasetProfile.columnCount
-        ? (datasetProfile.missingTotal / (datasetProfile.rowCount * datasetProfile.columnCount)) * 100
-        : 0
-      return `Missing values represent ${missingPct.toFixed(1)}% of the dataset.`
-    }
-    return 'The dataset suggests focusing on high-margin categories and tightening discount controls.'
   }
 
-  function handleAsk() {
-    if (!question.trim()) return
-    const response = answerQuestion(question)
-    setHistory(prev => ([
-      { question, response },
-      ...prev
-    ]))
-    setQuestion('')
-    onComplete('aiInsights')
+  function streamResponse(text) {
+    return new Promise((resolve) => {
+      let index = 0
+      const step = () => {
+        index += 1
+        setStreamingText(text.slice(0, index))
+        if (index >= text.length) {
+          setMessages((prev) => [...prev, { role: 'assistant', content: text }])
+          setStreamingText('')
+          resolve()
+          return
+        }
+        requestAnimationFrame(step)
+      }
+      requestAnimationFrame(step)
+    })
   }
-
-  const suggestions = [
-    'What affects sales most?',
-    'Show the latest trend.',
-    'How many missing values are there?'
-  ]
 
   return (
     <div className="ai-container">
       <div className="ai-header">
         <div>
           <h2 className="ai-title">AI Insights</h2>
-          <p className="ai-subtitle">Advanced analytics with natural language Q&A.</p>
+          <p className="ai-subtitle">Chat about the loaded dataset, with Groq when configured and local fallback when it is not.</p>
         </div>
       </div>
 
-      <div className="ai-grid">
-        <div className="ai-card">
-          <div className="ai-card-title">Smart Summary</div>
-          <div className="ai-metrics-grid">
-            <div className="ai-metric-box">
-              <div className="ai-metric-val">{datasetProfile.rowCount.toLocaleString()}</div>
-              <div className="ai-metric-label">Rows</div>
+      {statusMessage && (
+        <div className="alert alert-warning" style={{ marginBottom: '1rem' }}>{statusMessage}</div>
+      )}
+
+      <div className="ai-chat-shell">
+        <div className="ai-chat-sidebar">
+          <div className="ai-chat-summary">
+            <div className="ai-chat-metric">
+              <span>Rows</span>
+              <strong>{datasetProfile.rowCount.toLocaleString()}</strong>
             </div>
-            <div className="ai-metric-box">
-              <div className="ai-metric-val">{datasetProfile.columnCount}</div>
-              <div className="ai-metric-label">Columns</div>
+            <div className="ai-chat-metric">
+              <span>Columns</span>
+              <strong>{datasetProfile.columnCount}</strong>
             </div>
-            <div className="ai-metric-box">
-              <div className="ai-metric-val">{formatNumber(datasetProfile.missingTotal)}</div>
-              <div className="ai-metric-label">Missing</div>
+            <div className="ai-chat-metric">
+              <span>Missing</span>
+              <strong>{datasetProfile.missingTotal}</strong>
             </div>
+          </div>
+
+          <div className="ai-quick-questions">
+            <div className="ai-quick-title">Suggested questions</div>
+            {QUICK_QUESTIONS.map((item) => (
+              <button key={item} type="button" onClick={() => handleSend(item)}>
+                {item}
+              </button>
+            ))}
           </div>
         </div>
 
-        <div className="ai-card">
-          <div className="ai-card-title">Top Drivers</div>
-          {topCorrelation ? (
-            <div className="ai-quality-row">
-              <div className="ai-quality-grade" style={{ background: 'rgba(56,189,248,0.2)' }}>#1</div>
-              <div>
-                <div className="ai-quality-score">{topCorrelation.col}</div>
-                <div className="ai-quality-sub">Correlation {topCorrelation.value.toFixed(2)}</div>
-              </div>
-            </div>
-          ) : (
-            <p className="ai-subtitle">Not enough numeric columns to compute correlations.</p>
-          )}
-        </div>
-
-        <div className="ai-card ai-card--full">
-          <div className="ai-card-title">Ask a Question</div>
-          <div className="ai-qa">
-            <div className="ai-qa-input">
-              <input
-                className="qa-input"
-                value={question}
-                onChange={event => setQuestion(event.target.value)}
-                placeholder="Ask a question, for example: What affects sales most?"
-              />
-              <button className="btn btn-primary" type="button" onClick={handleAsk}>Ask</button>
-            </div>
-            <div className="ai-qa-suggestions">
-              {suggestions.map(item => (
-                <button key={item} className="qa-suggestion" type="button" onClick={() => setQuestion(item)}>
-                  {item}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="qa-list">
-            {history.length === 0 ? (
-              <p className="empty-text">No questions yet. Ask your first question above.</p>
+        <div className="ai-chat-main">
+          <div className="ai-chat-messages">
+            {messages.length === 0 && !streamingText ? (
+              <div className="ai-chat-empty">Ask a question to get started.</div>
             ) : (
-              history.map((item, index) => (
-                <div key={index} className="qa-item">
-                  <div className="qa-question">Q: {item.question}</div>
-                  <div className="qa-answer">A: {item.response}</div>
+              messages.map((message, idx) => (
+                <div key={`${message.role}-${idx}`} className={`ai-chat-bubble ${message.role}`}>
+                  {message.content}
                 </div>
               ))
             )}
+            {loading && (
+              <div className="ai-chat-bubble assistant">
+                <div className="typing-indicator">
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            )}
+            {streamingText && (
+              <div className="ai-chat-bubble assistant">{streamingText}</div>
+            )}
+          </div>
+
+          <div className="ai-chat-input">
+            <input
+              type="text"
+              placeholder="Ask anything about the dataset..."
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  handleSend()
+                }
+              }}
+            />
+            <button type="button" className="btn btn-primary" onClick={() => handleSend()} disabled={loading}>
+              Send
+            </button>
           </div>
         </div>
       </div>

@@ -4,11 +4,13 @@ No Streamlit dependencies; works purely with pandas/numpy/sklearn.
 """
 from __future__ import annotations
 
+import csv
 import gc
 import io
 import json
 import math
 import warnings
+from datetime import date, datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -31,6 +33,7 @@ from sklearn.ensemble import (
 from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
+    confusion_matrix,
     davies_bouldin_score,
     f1_score,
     mean_absolute_error,
@@ -73,6 +76,18 @@ except Exception as exc:  # pragma: no cover - depends on local env
     CATBOOST_IMPORT_ERROR = str(exc)
 
 warnings.filterwarnings("ignore")
+
+CSV_ENCODING_CANDIDATES = [
+    "utf-8-sig",
+    "utf-8",
+    "cp1252",
+    "latin1",
+    "iso-8859-1",
+    "utf-16",
+    "utf-16le",
+    "utf-16be",
+]
+CSV_DELIMITER_CANDIDATES = [",", ";", "\t", "|"]
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -176,32 +191,131 @@ def _sample_training_arrays(
     return X[indices], y[indices]
 
 
+def _csv_encoding_candidates(file_bytes: bytes) -> list[str]:
+    candidates: list[str] = []
+    header = file_bytes[:4]
+    preview = file_bytes[:4096]
+    null_ratio = preview.count(b"\x00") / max(len(preview), 1)
+
+    if header.startswith(b"\xef\xbb\xbf"):
+        candidates.append("utf-8-sig")
+    elif header.startswith(b"\xff\xfe"):
+        candidates.extend(["utf-16", "utf-16le"])
+    elif header.startswith(b"\xfe\xff"):
+        candidates.extend(["utf-16", "utf-16be"])
+
+    if null_ratio > 0.1:
+        candidates.extend(["utf-16", "utf-16le", "utf-16be"])
+
+    for encoding in CSV_ENCODING_CANDIDATES:
+        if encoding not in candidates:
+            candidates.append(encoding)
+    return candidates
+
+
+def _decode_csv_sample(file_bytes: bytes, encoding: str, sample_size: int = 65_536) -> str:
+    sample = file_bytes[:sample_size]
+    return sample.decode(encoding)
+
+
+def _sniff_csv_delimiter(sample_text: str) -> str:
+    preview_lines = [line for line in sample_text.splitlines() if line.strip()][:8]
+    if not preview_lines:
+        return ","
+
+    joined = "\n".join(preview_lines)
+    try:
+        dialect = csv.Sniffer().sniff(joined, delimiters=CSV_DELIMITER_CANDIDATES)
+        return dialect.delimiter
+    except Exception:
+        delimiter_counts = {
+            delimiter: sum(line.count(delimiter) for line in preview_lines)
+            for delimiter in CSV_DELIMITER_CANDIDATES
+        }
+        best = max(delimiter_counts, key=delimiter_counts.get)
+        return best if delimiter_counts[best] > 0 else ","
+
+
+def _csv_read_attempts(encoding: str, delimiter: str) -> list[dict[str, Any]]:
+    base = {
+        "encoding": encoding,
+        "sep": delimiter,
+    }
+    return [
+        {**base, "low_memory": False},
+        {**base, "engine": "python"},
+        {**base, "engine": "python", "on_bad_lines": "skip"},
+        {"encoding": encoding, "engine": "python", "sep": None, "on_bad_lines": "skip"},
+    ]
+
+
+def _read_csv_with_kwargs(
+    file_bytes: bytes,
+    read_kwargs: dict[str, Any],
+    *,
+    is_chunked: bool,
+) -> pd.DataFrame:
+    if not is_chunked:
+        return pd.read_csv(io.BytesIO(file_bytes), **read_kwargs)
+
+    chunks = []
+    chunk_kwargs = {
+        key: value
+        for key, value in read_kwargs.items()
+        if key != "low_memory"
+    }
+    chunk_kwargs["chunksize"] = 50_000
+    for chunk in pd.read_csv(io.BytesIO(file_bytes), **chunk_kwargs):
+        chunks.append(optimize_memory(chunk))
+    if not chunks:
+        return pd.DataFrame()
+    df = pd.concat(chunks, ignore_index=True)
+    gc.collect()
+    return df
+
+
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# CSV LOADING
+# CSV / Excel loading
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def load_csv(file_bytes: bytes) -> pd.DataFrame:
     """Load CSV with chunked reading for large files."""
-    buf = io.BytesIO(file_bytes)
-    try:
-        line_count = sum(1 for _ in buf) - 1
-        buf.seek(0)
-    except Exception:
-        line_count = None
-        buf.seek(0)
-
     CHUNK_THRESHOLD = 200_000
+    line_count = max(file_bytes.count(b"\n"), 1) - 1
+    is_chunked = line_count > CHUNK_THRESHOLD
+    last_error = None
 
-    if line_count is None or line_count <= CHUNK_THRESHOLD:
-        df = pd.read_csv(buf)
-    else:
-        chunks = []
-        for chunk in pd.read_csv(buf, chunksize=50_000):
-            chunks.append(optimize_memory(chunk))
-        df = pd.concat(chunks, ignore_index=True)
-        gc.collect()
-        return df
+    for encoding in _csv_encoding_candidates(file_bytes):
+        try:
+            sample_text = _decode_csv_sample(file_bytes, encoding)
+        except UnicodeDecodeError as exc:
+            last_error = exc
+            continue
 
+        if not sample_text.strip():
+            continue
+        if sample_text.count("\x00") / max(len(sample_text), 1) > 0.02:
+            continue
+
+        delimiter = _sniff_csv_delimiter(sample_text)
+        for read_kwargs in _csv_read_attempts(encoding, delimiter):
+            try:
+                df = _read_csv_with_kwargs(file_bytes, read_kwargs, is_chunked=is_chunked)
+                return optimize_memory(df)
+            except UnicodeDecodeError as exc:
+                last_error = exc
+                break
+            except Exception as exc:
+                last_error = exc
+                continue
+
+    raise ValueError(f"Unsupported CSV encoding or malformed CSV. Last error: {last_error}")
+
+
+def load_excel(file_bytes: bytes) -> pd.DataFrame:
+    """Load Excel file into a DataFrame."""
+    buf = io.BytesIO(file_bytes)
+    df = pd.read_excel(buf, engine="openpyxl")
     return optimize_memory(df)
 
 
@@ -214,7 +328,7 @@ def serialize_dataframe(df: pd.DataFrame, limit: Optional[int] = None) -> list[d
     return sanitize_for_json(data.to_dict(orient="records"))
 
 
-def build_dataset_snapshot(df: pd.DataFrame) -> dict:
+def build_dataset_snapshot(df: pd.DataFrame, preview_limit: int = 20, sample_limit: int = 5_000) -> dict:
     n_total = len(df)
     columns_info = []
     for col in df.columns:
@@ -234,10 +348,12 @@ def build_dataset_snapshot(df: pd.DataFrame) -> dict:
         "numeric_cols": int(df.select_dtypes(include=np.number).shape[1]),
         "categorical_cols": int(df.select_dtypes(include=["object", "category"]).shape[1]),
         "columns_info": columns_info,
-        "preview": serialize_dataframe(df, limit=20),
+        "preview": serialize_dataframe(df, limit=preview_limit),
+        "sample_rows": serialize_dataframe(df, limit=sample_limit),
         "missing_total": int(df.isnull().sum().sum()),
         "sampling_info": get_sampling_info(n_total),
         "all_columns": df.columns.tolist(),
+        "backend_managed": True,
     })
 
 
@@ -252,6 +368,19 @@ def sanitize_for_json(value: Any) -> Any:
         return [sanitize_for_json(item) for item in value]
     if isinstance(value, tuple):
         return [sanitize_for_json(item) for item in value]
+    if isinstance(value, np.ndarray):
+        return [sanitize_for_json(item) for item in value.tolist()]
+    if isinstance(value, (pd.Series, pd.Index)):
+        return [sanitize_for_json(item) for item in value.tolist()]
+    if isinstance(value, (pd.Timestamp, datetime, date)):
+        return value.isoformat()
+    if isinstance(value, pd.Timedelta):
+        return str(value)
+    if isinstance(value, np.datetime64):
+        try:
+            return pd.Timestamp(value).isoformat()
+        except Exception:
+            return str(value)
     if isinstance(value, (np.floating, float)):
         numeric = float(value)
         if math.isnan(numeric) or math.isinf(numeric):
@@ -262,6 +391,122 @@ def sanitize_for_json(value: Any) -> Any:
     if isinstance(value, (np.bool_,)):
         return bool(value)
     return value
+
+
+IDENTIFIER_HINTS = ("id", "uuid", "guid", "index", "serial", "empid", "employeeid", "code")
+TARGET_HINTS = (
+    "target",
+    "label",
+    "class",
+    "status",
+    "attrition",
+    "churn",
+    "outcome",
+    "result",
+    "response",
+    "category",
+    "segment",
+    "rating",
+    "score",
+    "sales",
+    "revenue",
+    "price",
+    "amount",
+)
+
+
+def _normalise_name(name: str) -> str:
+    return "".join(ch for ch in str(name).strip().lower() if ch.isalnum())
+
+
+def _is_identifier_like(column_name: str, series: pd.Series) -> bool:
+    normalised_name = _normalise_name(column_name)
+    if any(hint in normalised_name for hint in IDENTIFIER_HINTS) or normalised_name.endswith("id"):
+        return True
+
+    non_null = series.dropna()
+    if len(non_null) < 12:
+        return False
+
+    as_text = non_null.astype(str).str.strip()
+    unique_ratio = float(as_text.nunique(dropna=True) / max(len(as_text), 1))
+    numeric_ratio = float(pd.to_numeric(non_null, errors="coerce").notna().mean())
+    return unique_ratio >= 0.98 and numeric_ratio >= 0.8
+
+
+def _infer_task_type_from_target(series: pd.Series) -> str:
+    non_null = series.dropna()
+    if non_null.empty:
+        return "Classification"
+
+    as_text = non_null.astype(str).str.strip()
+    numeric_ratio = float(pd.to_numeric(non_null, errors="coerce").notna().mean())
+    unique_count = int(as_text.nunique(dropna=True))
+    threshold = min(20, max(6, int(len(as_text) * 0.1)))
+    return "Regression" if numeric_ratio >= 0.8 and unique_count > threshold else "Classification"
+
+
+def _recommend_target_column(df: pd.DataFrame, exclude: Optional[list[str]] = None) -> Optional[str]:
+    excluded = set(exclude or [])
+    candidates = [str(column) for column in df.columns.tolist() if str(column) not in excluded]
+    if not candidates:
+        return None
+
+    def _score(column_name: str) -> float:
+        series = df[column_name]
+        non_null = series.dropna()
+        if non_null.empty:
+            return -1_000.0
+
+        normalised_name = _normalise_name(column_name)
+        unique_count = int(non_null.astype(str).nunique(dropna=True))
+        unique_ratio = float(unique_count / max(len(non_null), 1))
+        numeric_ratio = float(pd.to_numeric(non_null, errors="coerce").notna().mean())
+        identifier_like = _is_identifier_like(column_name, series)
+
+        score = 0.0
+        if any(hint in normalised_name for hint in TARGET_HINTS):
+            score += 40.0
+        if identifier_like:
+            score -= 80.0
+        if 2 <= unique_count <= max(12, int(len(non_null) * 0.2)):
+            score += 25.0
+        if numeric_ratio >= 0.8 and unique_count > min(20, max(8, int(len(non_null) * 0.1))):
+            score += 12.0
+        if unique_ratio >= 0.98:
+            score -= 20.0
+        if series.nunique(dropna=True) <= 1:
+            score -= 100.0
+        return score
+
+    ranked = sorted(candidates, key=_score, reverse=True)
+    if not ranked:
+        return None
+
+    best = ranked[0]
+    if _score(best) > -50:
+        return best
+
+    non_identifier = [column for column in ranked if not _is_identifier_like(column, df[column])]
+    return non_identifier[0] if non_identifier else best
+
+
+def _safe_random_state(random_state: int) -> int:
+    try:
+        return int(random_state)
+    except Exception:
+        return 42
+
+
+def _safe_test_count(n_rows: int, test_size: float) -> int:
+    if n_rows <= 1:
+        return 0
+    try:
+        ratio = float(test_size)
+    except Exception:
+        ratio = 0.2
+    ratio = min(max(ratio, 0.1), 0.5)
+    return min(max(1, int(round(n_rows * ratio))), n_rows - 1)
 
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -283,42 +528,116 @@ def preprocess(
     Mirrors the Streamlit preprocessing section exactly.
     """
     df = df.copy()
+    if df.empty:
+        raise ValueError("The dataset is empty.")
+
+    df.columns = [str(column) for column in df.columns.tolist()]
 
     # Convert category dtype back to object for processing
     for col in df.select_dtypes(include="category").columns:
         df[col] = df[col].astype(str)
 
+    if target_col not in df.columns:
+        fallback_target = _recommend_target_column(df)
+        if not fallback_target:
+            raise ValueError("No usable target column was found in the dataset.")
+        target_col = fallback_target
+
+    auto_warnings: List[str] = []
+    recommended_target = _recommend_target_column(df, exclude=[])
+    if (
+        target_col in df.columns
+        and recommended_target
+        and recommended_target != target_col
+        and _is_identifier_like(target_col, df[target_col])
+    ):
+        auto_warnings.append(
+            f"Switched target from {target_col} to {recommended_target} because the selected column looked like an identifier."
+        )
+        target_col = recommended_target
+
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
-    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    cat_cols = df.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
     large_dataset_mode = _is_large_dataset(len(df), df.shape[1])
 
     # 1. Missing values
     if missing_strategy == "Drop rows with missing values":
-        df.dropna(inplace=True)
+        df = df.dropna().copy()
     elif missing_strategy == "Fill with mean (numeric)":
         for c in num_cols:
             if c in df.columns:
-                df[c].fillna(df[c].mean(), inplace=True)
+                df[c] = df[c].fillna(df[c].mean())
         for c in cat_cols:
-            df[c].fillna(df[c].mode()[0] if not df[c].mode().empty else "Unknown", inplace=True)
+            if c in df.columns:
+                mode = df[c].mode(dropna=True)
+                df[c] = df[c].fillna(mode.iloc[0] if not mode.empty else "Unknown")
     elif missing_strategy == "Fill with median (numeric)":
         for c in num_cols:
             if c in df.columns:
-                df[c].fillna(df[c].median(), inplace=True)
+                df[c] = df[c].fillna(df[c].median())
         for c in cat_cols:
-            df[c].fillna(df[c].mode()[0] if not df[c].mode().empty else "Unknown", inplace=True)
+            if c in df.columns:
+                mode = df[c].mode(dropna=True)
+                df[c] = df[c].fillna(mode.iloc[0] if not mode.empty else "Unknown")
     elif missing_strategy == "Fill with mode (all)":
         for c in df.columns:
-            if not df[c].mode().empty:
-                df[c].fillna(df[c].mode()[0], inplace=True)
+            mode = df[c].mode(dropna=True)
+            if not mode.empty:
+                df[c] = df[c].fillna(mode.iloc[0])
+
+    df = df.replace([np.inf, -np.inf], np.nan)
+    if df.empty:
+        raise ValueError("No rows remained after applying the missing-value strategy.")
+
+    if target_col not in df.columns:
+        fallback_target = _recommend_target_column(df)
+        if not fallback_target:
+            raise ValueError("No usable target column remained after preprocessing.")
+        auto_warnings.append(f"Target column was no longer available, so {fallback_target} was selected instead.")
+        target_col = fallback_target
+
+    target_series = df[target_col]
+    if target_series.dropna().empty or target_series.nunique(dropna=True) <= 1:
+        fallback_target = _recommend_target_column(df, exclude=[target_col])
+        if fallback_target and fallback_target != target_col:
+            auto_warnings.append(
+                f"Switched target from {target_col} to {fallback_target} because the original target did not contain enough signal."
+            )
+            target_col = fallback_target
+            target_series = df[target_col]
+        else:
+            raise ValueError("The selected target column does not contain enough usable values.")
+
+    inferred_task = _infer_task_type_from_target(target_series)
+    unique_target_values = int(target_series.astype(str).nunique(dropna=True))
+    target_numeric_ratio = float(pd.to_numeric(target_series.dropna(), errors="coerce").notna().mean()) if len(target_series.dropna()) else 0.0
+    if str(task_type or "").strip() not in {"Classification", "Regression"}:
+        task_type = inferred_task
+    elif task_type != inferred_task and (
+        _is_identifier_like(target_col, target_series)
+        or unique_target_values <= max(12, int(len(df) * 0.2))
+        or target_numeric_ratio < 0.8
+    ):
+        auto_warnings.append(
+            f"Adjusted task type from {task_type} to {inferred_task} to match the selected target column."
+        )
+        task_type = inferred_task
+    if task_type == "Regression" and target_numeric_ratio < 0.8:
+        auto_warnings.append("Selected regression target was not numeric enough, so the task was switched to Classification.")
+        task_type = "Classification"
+    elif task_type == "Classification" and unique_target_values > min(40, max(10, int(len(df) * 0.25))) and target_numeric_ratio >= 0.8:
+        auto_warnings.append("Selected classification target had too many unique numeric values, so the task was switched to Regression.")
+        task_type = "Regression"
 
     # 2. Encode categoricals
     label_encoders: Dict[str, LabelEncoder] = {}
-    cat_cols_current = df.select_dtypes(include="object").columns.tolist()
+    cat_cols_current = df.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
     encoding_warnings: List[str] = []
 
     if encode_method == "Label Encoding" and cat_cols_current:
         for c in cat_cols_current:
+            if c not in df.columns:
+                continue
             le = LabelEncoder()
             df[c] = le.fit_transform(df[c].astype(str))
             label_encoders[c] = le
@@ -330,7 +649,7 @@ def preprocess(
         for c in cat_cols_current:
             if c == target_col:
                 continue
-            if df[c].nunique() > low_card_limit:
+            if df[c].nunique(dropna=True) > low_card_limit:
                 high_card_cols.append(c)
             else:
                 low_card_cols.append(c)
@@ -342,6 +661,8 @@ def preprocess(
                 "to keep memory usage stable during preprocessing and training."
             )
             for c in cat_cols_current:
+                if c not in df.columns:
+                    continue
                 le = LabelEncoder()
                 df[c] = le.fit_transform(df[c].astype(str))
                 label_encoders[c] = le
@@ -354,6 +675,8 @@ def preprocess(
                 "Applied Label Encoding instead to prevent memory crash."
             )
             for c in high_card_cols:
+                if c not in df.columns:
+                    continue
                 le = LabelEncoder()
                 df[c] = le.fit_transform(df[c].astype(str))
                 label_encoders[c] = le
@@ -361,21 +684,53 @@ def preprocess(
         if low_card_cols:
             df = pd.get_dummies(df, columns=low_card_cols, drop_first=True, dtype=np.int8)
 
-        if target_col in df.columns and df[target_col].dtype == "object":
+        if target_col in df.columns and str(df[target_col].dtype) in {"object", "bool", "category"}:
             le = LabelEncoder()
             df[target_col] = le.fit_transform(df[target_col].astype(str))
             label_encoders[target_col] = le
 
     # 3. Split
-    X = df.drop(columns=[target_col])
+    X = df.drop(columns=[target_col], errors="ignore")
+    if X.empty:
+        X = pd.DataFrame({"__row_index": np.arange(len(df), dtype=np.int32)}, index=df.index)
+        auto_warnings.append("No feature columns were left after selecting the target, so a row-index feature was added automatically.")
+
     y = df[target_col]
     X = X.apply(pd.to_numeric, errors="coerce").fillna(0)
-    if task_type == "Regression":
-        y = pd.to_numeric(y, errors="coerce").fillna(0)
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=test_size, random_state=random_state
-    )
+    if task_type == "Regression":
+        numeric_target = pd.to_numeric(y, errors="coerce")
+        fill_value = float(numeric_target.median()) if numeric_target.notna().any() else 0.0
+        y = numeric_target.fillna(fill_value)
+    else:
+        y = y.astype(str).fillna("Unknown")
+
+    if len(X) < 2:
+        raise ValueError("At least two usable rows are required for preprocessing.")
+
+    test_count = _safe_test_count(len(X), test_size)
+    random_state = _safe_random_state(random_state)
+
+    try:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=test_count,
+            random_state=random_state,
+            shuffle=True,
+        )
+    except Exception:
+        fallback_test_count = 1 if len(X) > 1 else 0
+        if fallback_test_count == 0:
+            raise ValueError("The dataset is too small to split into train and test sets.")
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
+            test_size=fallback_test_count,
+            random_state=42,
+            shuffle=True,
+        )
+        auto_warnings.append("Adjusted the train-test split automatically to keep preprocessing stable.")
 
     # 4. Smart sampling on training split only
     n_train = len(X_train)
@@ -386,7 +741,8 @@ def preprocess(
         if task_type == "Classification":
             try:
                 X_train, _, y_train, _ = train_test_split(
-                    X_train, y_train,
+                    X_train,
+                    y_train,
                     train_size=sample_n,
                     stratify=y_train,
                     random_state=42,
@@ -410,6 +766,9 @@ def preprocess(
         scaler = MinMaxScaler()
         X_train = pd.DataFrame(scaler.fit_transform(X_train), columns=X.columns).astype(np.float32)
         X_test = pd.DataFrame(scaler.transform(X_test), columns=X.columns).astype(np.float32)
+    else:
+        X_train = X_train.reset_index(drop=True)
+        X_test = X_test.reset_index(drop=True)
 
     X_train = optimize_memory(X_train.copy())
     X_test = optimize_memory(X_test.copy())
@@ -421,14 +780,16 @@ def preprocess(
         "feature_columns": X.columns.tolist(),
         "X_train": X_train,
         "X_test": X_test,
-        "y_train": y_train,
-        "y_test": y_test,
+        "y_train": y_train.reset_index(drop=True),
+        "y_test": y_test.reset_index(drop=True),
         "scaler": scaler,
         "label_encoders": label_encoders,
         "sampled": sampled_flag,
         "sample_size": samp_info["sample_size"],
-        "encoding_warnings": encoding_warnings,
+        "encoding_warnings": [*auto_warnings, *encoding_warnings],
         "large_dataset_mode": large_dataset_mode,
+        "target_col": target_col,
+        "task_type": task_type,
     }
 
 
@@ -1391,6 +1752,38 @@ def create_visualization(
         "sample_size": sample_size,
     }
 
+def _extract_feature_importance(model: Any, feature_columns: list[str]) -> list[dict[str, Any]]:
+    if model is None or not feature_columns:
+        return []
+
+    values = None
+    if hasattr(model, "feature_importances_"):
+        values = model.feature_importances_
+    elif hasattr(model, "coef_"):
+        coef = model.coef_
+        if hasattr(coef, "ndim") and coef.ndim > 1:
+            values = np.mean(np.abs(coef), axis=0)
+        else:
+            values = np.abs(coef)
+
+    if values is None:
+        return []
+
+    try:
+        flat_values = np.array(values).flatten()
+    except Exception:
+        return []
+
+    if len(flat_values) != len(feature_columns):
+        return []
+
+    pairs = list(zip(feature_columns, flat_values))
+    pairs.sort(key=lambda item: item[1], reverse=True)
+    return [
+        {"feature": str(feature), "importance": float(score)}
+        for feature, score in pairs[:12]
+    ]
+
 
 def build_best_model_summary(
     best_model: Any,
@@ -1454,6 +1847,20 @@ def build_best_model_summary(
     except Exception:
         learning_curve_figure = None
 
+    confusion = None
+    confusion_labels = None
+    if task_type == "Classification":
+        try:
+            y_pred = best_model.predict(X_test)
+            labels = np.unique(np.concatenate([np.array(y_test), np.array(y_pred)]))
+            confusion = confusion_matrix(y_test, y_pred, labels=labels).tolist()
+            confusion_labels = [str(label) for label in labels]
+        except Exception:
+            confusion = None
+            confusion_labels = None
+
+    feature_importance = _extract_feature_importance(best_model, list(X_train.columns))
+
     return {
         "best_model_name": best_model_name,
         "task_type": task_type,
@@ -1461,5 +1868,7 @@ def build_best_model_summary(
         "results": serialize_dataframe(model_results, limit=None),
         "learning_curve": learning_curve_figure,
         "cluster_results": cluster_results or [],
+        "feature_importance": feature_importance,
+        "confusion_matrix": confusion,
+        "confusion_labels": confusion_labels,
     }
-

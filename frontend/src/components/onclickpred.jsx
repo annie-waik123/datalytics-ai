@@ -1,284 +1,363 @@
-import React, { useState, useEffect } from 'react';
-import client from '../api/client.js';
+import { useEffect, useState } from 'react'
+import client from '../api/client.js'
+import { buildDatasetSyncPayload, isBackendDatasetReady } from '../api/datasetSession.js'
+import { useToast } from '../hooks/useToast.js'
+
+const IDENTIFIER_HINTS = ['id', 'uuid', 'guid', 'index', 'serial', 'code', 'employeeid', 'empid']
+const TARGET_HINTS = ['target', 'label', 'class', 'status', 'attrition', 'churn', 'outcome', 'result', 'response', 'category', 'segment', 'rating', 'score', 'sales', 'revenue', 'price', 'amount']
+
+function normalizeName(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function columnValues(dataset, column) {
+  return (dataset?.rows || [])
+    .map((row) => row?.[column])
+    .filter((value) => value !== null && value !== undefined && value !== '')
+}
+
+function isNumericLike(value) {
+  return Number.isFinite(Number(value))
+}
+
+function isIdentifierLike(column, values) {
+  const normalized = normalizeName(column)
+  if (IDENTIFIER_HINTS.some((hint) => normalized.includes(hint)) || normalized.endsWith('id')) {
+    return true
+  }
+  if (values.length < 12) return false
+  const uniqueRatio = new Set(values.map((value) => String(value))).size / values.length
+  const numericRatio = values.filter(isNumericLike).length / values.length
+  return uniqueRatio >= 0.98 && numericRatio >= 0.8
+}
+
+function inferTaskType(dataset, column) {
+  const values = columnValues(dataset, column)
+  if (!values.length) return 'Classification'
+  const uniqueCount = new Set(values.map((value) => String(value))).size
+  const numericRatio = values.filter(isNumericLike).length / values.length
+  return numericRatio >= 0.8 && uniqueCount > Math.min(20, Math.max(6, Math.floor(values.length * 0.1)))
+    ? 'Regression'
+    : 'Classification'
+}
+
+function targetScore(dataset, column) {
+  const values = columnValues(dataset, column)
+  if (!values.length) return -1000
+
+  const normalized = normalizeName(column)
+  const uniqueCount = new Set(values.map((value) => String(value))).size
+  const uniqueRatio = uniqueCount / values.length
+  const numericRatio = values.filter(isNumericLike).length / values.length
+  const identifierLike = isIdentifierLike(column, values)
+
+  let score = 0
+  if (TARGET_HINTS.some((hint) => normalized.includes(hint))) score += 40
+  if (identifierLike) score -= 80
+  if (uniqueCount >= 2 && uniqueCount <= Math.max(12, Math.floor(values.length * 0.2))) score += 25
+  if (numericRatio >= 0.8 && uniqueCount > Math.min(20, Math.max(8, Math.floor(values.length * 0.1)))) score += 12
+  if (uniqueRatio >= 0.98) score -= 20
+  return score
+}
+
+function recommendTargetColumn(dataset) {
+  const columns = dataset?.columns || []
+  if (!columns.length) return ''
+  const ranked = [...columns].sort((left, right) => targetScore(dataset, right) - targetScore(dataset, left))
+  const best = ranked[0]
+  if (best && targetScore(dataset, best) > -50) return best
+  const nonIdentifier = columns.find((column) => !isIdentifierLike(column, columnValues(dataset, column)))
+  return nonIdentifier || columns[0]
+}
+
+function buildAutomaticPayload(dataset, overrides = {}) {
+  const target_col = overrides.target_col || recommendTargetColumn(dataset)
+  return {
+    target_col,
+    task_type: overrides.task_type || inferTaskType(dataset, target_col),
+    missing_strategy: overrides.missing_strategy || 'Fill with mode (all)',
+    encode_method: overrides.encode_method || 'Label Encoding',
+    scaling_method: overrides.scaling_method || 'StandardScaler',
+    test_size: overrides.test_size || 0.2,
+    random_state: Number(overrides.random_state) || 42,
+  }
+}
+
+async function syncDatasetForPrediction(dataset) {
+  if (isBackendDatasetReady(dataset)) {
+    return
+  }
+
+  const payload = buildDatasetSyncPayload(dataset, { replaceOriginal: true })
+
+  try {
+    await client.post('/data/sync', payload)
+  } catch (error) {
+    if (error?.response?.status !== 404) throw error
+    await client.post('/visualization/sync', payload)
+  }
+}
+
+function payloadChanged(left, right) {
+  const keys = ['target_col', 'task_type', 'missing_strategy', 'encode_method', 'scaling_method', 'test_size', 'random_state']
+  return keys.some((key) => left?.[key] !== right?.[key])
+}
 
 export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
-  const columns = dataset?.columns || [];
-  
-  // State for preprocessing options
-  const [targetCol, setTargetCol] = useState(columns[0] || '');
-  const [taskType, setTaskType] = useState('Classification');
-  const [missingStrategy, setMissingStrategy] = useState('Fill with mean (numeric)');
-  const [encoding, setEncoding] = useState('Label Encoding');
-  const [scaling, setScaling] = useState('StandardScaler');
-  const [testSize, setTestSize] = useState(20);
-  const [randomState, setRandomState] = useState(42);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const { addToast } = useToast()
+  const columns = dataset?.columns || []
 
-  // Sync targetCol when columns change
+  const [targetCol, setTargetCol] = useState('')
+  const [targetAuto, setTargetAuto] = useState(true)
+  const [taskType, setTaskType] = useState('Classification')
+  const [taskAuto, setTaskAuto] = useState(true)
+  const [missingStrategy, setMissingStrategy] = useState('Fill with mode (all)')
+  const [encoding, setEncoding] = useState('Label Encoding')
+  const [scaling, setScaling] = useState('StandardScaler')
+  const [testSize, setTestSize] = useState(20)
+  const [randomState, setRandomState] = useState(42)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [warnings, setWarnings] = useState([])
+  const [success, setSuccess] = useState(false)
+
   useEffect(() => {
-    if (columns.length > 0 && !columns.includes(targetCol)) {
-      setTargetCol(columns[0]);
+    setTargetAuto(true)
+  }, [dataset?.name, columns.join('|')])
+
+  useEffect(() => {
+    if (!columns.length) {
+      setTargetCol('')
+      return
     }
-  }, [columns, targetCol]);
+    if (!targetAuto && columns.includes(targetCol)) return
+    const recommended = recommendTargetColumn(dataset)
+    setTargetCol(recommended || columns[0])
+  }, [columns, dataset, targetAuto, targetCol])
+
+  useEffect(() => {
+    if (!targetCol) return
+    setTaskAuto(true)
+  }, [targetCol])
+
+  useEffect(() => {
+    if (!taskAuto || !targetCol) return
+    setTaskType(inferTaskType(dataset, targetCol))
+  }, [dataset, targetCol, taskAuto])
+
+  async function submitPreprocess(payload) {
+    await syncDatasetForPrediction(dataset)
+    return client.post('/preprocess', payload)
+  }
+
+  function applyResolvedState(responseData, payload) {
+    const resolvedTarget = responseData?.target_col || payload.target_col
+    const resolvedTask = responseData?.task_type || payload.task_type
+    setTargetCol(resolvedTarget)
+    setTaskType(resolvedTask)
+    setTargetAuto(false)
+    setTaskAuto(false)
+    setWarnings(responseData?.encoding_warnings || [])
+  }
 
   async function handleApply() {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-    
-    try {
-      const payload = {
-        target_col: targetCol,
-        task_type: taskType,
-        missing_strategy: missingStrategy,
-        encode_method: encoding,
-        scaling_method: scaling,
-        test_size: testSize / 100,
-        random_state: Number(randomState),
-      };
+    setLoading(true)
+    setError(null)
+    setWarnings([])
+    setSuccess(false)
 
-      const res = await client.post('/preprocess', payload);
-      
-      if (setStatus) {
-        setStatus(s => ({ 
-          ...s, 
-          preprocessing_done: true,
-          preprocess_data: res.data,
-          supervised_done: false,
-          unsupervised_done: false
-        }));
+    const initialPayload = buildAutomaticPayload(dataset, {
+      target_col: targetCol,
+      task_type: taskType,
+      missing_strategy: missingStrategy,
+      encode_method: encoding,
+      scaling_method: scaling,
+      test_size: Number(testSize) / 100,
+      random_state: Number(randomState),
+    })
+
+    try {
+      let response
+      let usedPayload = initialPayload
+      try {
+        response = await submitPreprocess(initialPayload)
+      } catch (firstError) {
+        const fallbackPayload = buildAutomaticPayload(dataset, {
+          missing_strategy: 'Fill with mode (all)',
+          encode_method: 'Label Encoding',
+          scaling_method: scaling === 'None' ? 'None' : 'StandardScaler',
+          test_size: 0.2,
+          random_state: Number(randomState) || 42,
+        })
+
+        if (!payloadChanged(initialPayload, fallbackPayload)) {
+          throw firstError
+        }
+
+        response = await submitPreprocess(fallbackPayload)
+        usedPayload = fallbackPayload
+        addToast('Preprocessing settings were adjusted automatically to keep the pipeline running.', null, 'success')
       }
-      
-      setSuccess(true);
-      // Auto-switch to next step after success
+
+      if (!response) return
+
+      applyResolvedState(response.data, usedPayload)
+
+      if (setStatus) {
+        setStatus((s) => ({
+          ...s,
+          preprocessing_done: true,
+          preprocess_data: response.data,
+          supervised_done: false,
+          unsupervised_done: false,
+        }))
+      }
+
+      if (onPreprocessed) onPreprocessed(response.data)
+
+      setSuccess(true)
       setTimeout(() => {
         if (setStatus) {
-          setStatus(s => ({ ...s, current_module: 'supervised' }));
+          setStatus((s) => ({ ...s, current_module: 'supervised' }))
         }
-      }, 1500);
+      }, 1200)
     } catch (err) {
-      console.error('Preprocessing failed:', err);
-      setError(err.response?.data?.detail || 'Preprocessing failed. Please check your data and parameters.');
+      setError(err.response?.data?.detail || err.message || 'Preprocessing failed. Please check your data and parameters.')
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
   return (
-    <div className="modern-preprocess-container" style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1 className="page-title" style={{ fontSize: '2.4rem', fontWeight: 700, marginBottom: '2rem', color: '#fff' }}>
-        Data Preprocessing
-      </h1>
+    <div>
+      <div className="step-header">
+        <div>
+          <h1 className="page-title">Data Preprocessing</h1>
+          <p className="page-subtitle">Configure cleaning, encoding, and scaling before training models.</p>
+        </div>
+      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        
-        {/* Section 1: Target Column */}
-        <div className="glass-card" style={{ padding: '28px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '1.2rem' }}>🎯</span>
-            <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Target Column</span>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="section-title">Target Column & Task</div>
+        <div className="form-row form-row-2">
+          <div className="form-group">
+            <label>Target Column</label>
+            <select
+              value={targetCol}
+              onChange={(e) => {
+                setTargetAuto(false)
+                setTargetCol(e.target.value)
+              }}
+            >
+              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
+            </select>
           </div>
-          <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '250px' }}>
-              <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', display: 'block', marginBottom: '10px' }}>
-                Target Column
-              </label>
-              <select 
-                value={targetCol}
-                onChange={(e) => setTargetCol(e.target.value)}
-                style={{ width: '100%', background: '#0d1225', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', color: '#fff', outline: 'none' }}
-              >
-                {columns.map(col => <option key={col} value={col}>{col}</option>)}
-              </select>
-            </div>
-            <div style={{ flex: 1, minWidth: '250px' }}>
-              <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', display: 'block', marginBottom: '10px' }}>
-                Task Type
-              </label>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                {['Classification', 'Regression'].map(type => (
-                  <button
-                    key={type}
-                    onClick={() => setTaskType(type)}
-                    style={{
-                      flex: 1,
-                      padding: '12px',
-                      borderRadius: '10px',
-                      border: taskType === type ? '1px solid #ff6a00' : '1px solid rgba(255,255,255,0.1)',
-                      background: taskType === type ? 'rgba(255,106,0,0.1)' : 'rgba(255,255,255,0.02)',
-                      color: taskType === type ? '#ff6a00' : 'rgba(255,255,255,0.5)',
-                      fontSize: '0.75rem',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: taskType === type ? '0 0 15px rgba(255,106,0,0.15)' : 'none'
-                    }}
-                  >
-                    {type === 'Classification' ? '🏷️ ' : '📈 '} {type.toUpperCase()}
-                  </button>
-                ))}
-              </div>
+          <div className="form-group">
+            <label>Task Type</label>
+            <div className="chip-group">
+              {['Classification', 'Regression'].map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  className={`chip ${taskType === type ? 'is-active' : ''}`}
+                  onClick={() => {
+                    setTaskAuto(false)
+                    setTaskType(type)
+                  }}
+                >
+                  {type}
+                </button>
+              ))}
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Section 2: Missing Values */}
-        <div className="glass-card" style={{ padding: '28px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '1.2rem' }}>🖌️</span>
-            <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Handle Missing Values</span>
-          </div>
-          <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', display: 'block', marginBottom: '10px' }}>
-            Strategy
-          </label>
-          <select 
-            value={missingStrategy}
-            onChange={(e) => setMissingStrategy(e.target.value)}
-            style={{ width: '100%', background: '#0d1225', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', color: '#fff', outline: 'none' }}
-          >
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="section-title">Missing Values</div>
+        <div className="form-group">
+          <label>Strategy</label>
+          <select value={missingStrategy} onChange={(e) => setMissingStrategy(e.target.value)}>
             <option value="Drop rows with missing values">Drop rows with missing values</option>
             <option value="Fill with mean (numeric)">Fill with mean (numeric)</option>
             <option value="Fill with median (numeric)">Fill with median (numeric)</option>
             <option value="Fill with mode (all)">Fill with mode (all)</option>
           </select>
         </div>
-
-        {/* Section 3: Encoding */}
-        <div className="glass-card" style={{ padding: '28px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '1.2rem' }}>📋</span>
-            <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Encode Categorical Variables</span>
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {['Label Encoding', 'One-Hot Encoding'].map(type => (
-              <button
-                key={type}
-                onClick={() => setEncoding(type)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '10px',
-                  border: encoding === type ? '1px solid #ff6a00' : '1px solid rgba(255,255,255,0.1)',
-                  background: encoding === type ? 'rgba(255,106,0,0.1)' : 'rgba(255,255,255,0.02)',
-                  color: encoding === type ? '#ff6a00' : 'rgba(255,255,255,0.5)',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {type.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Section 4: Scaling */}
-        <div className="glass-card" style={{ padding: '28px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '1.2rem' }}>⚖️</span>
-            <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Feature Scaling</span>
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {['None', 'StandardScaler', 'MinMaxScaler'].map(type => (
-              <button
-                key={type}
-                onClick={() => setScaling(type)}
-                style={{
-                  padding: '12px 24px',
-                  borderRadius: '10px',
-                  border: scaling === type ? '1px solid #ff6a00' : '1px solid rgba(255,255,255,0.1)',
-                  background: scaling === type ? 'rgba(255,106,0,0.1)' : 'rgba(255,255,255,0.02)',
-                  color: scaling === type ? '#ff6a00' : 'rgba(255,255,255,0.5)',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {type.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Section 5: Train-Test Split */}
-        <div className="glass-card" style={{ padding: '28px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <span style={{ fontSize: '1.2rem' }}>✂️</span>
-            <span style={{ fontWeight: 600, color: 'rgba(255,255,255,0.9)' }}>Train-Test Split</span>
-          </div>
-          <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-            <div style={{ flex: 2, minWidth: '300px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px' }}>
-                  Test Size: {testSize}%
-                </label>
-              </div>
-              <input 
-                type="range" 
-                min="10" 
-                max="50" 
-                value={testSize} 
-                onChange={(e) => setTestSize(e.target.value)}
-                style={{ width: '100%', height: '6px', borderRadius: '3px', background: 'rgba(255,255,255,0.1)', accentColor: '#ff6a00', cursor: 'pointer' }}
-              />
-            </div>
-            <div style={{ flex: 1, minWidth: '150px' }}>
-              <label style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', letterSpacing: '1px', display: 'block', marginBottom: '10px' }}>
-                Random State
-              </label>
-              <input 
-                type="number" 
-                value={randomState}
-                onChange={(e) => setRandomState(e.target.value)}
-                style={{ width: '100%', background: '#0d1225', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px', padding: '12px', color: '#fff', outline: 'none' }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="alert alert-danger" style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '16px', borderRadius: '12px' }}>
-            ⚠️ {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="alert alert-success" style={{ background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.2)', color: '#22c55e', padding: '16px', borderRadius: '12px' }}>
-            ✅ Preprocessing successful! Next steps are now unlocked.
-          </div>
-        )}
-
-        {/* Section 6: Submit Button */}
-        <button
-          onClick={handleApply}
-          disabled={loading || !dataset || columns.length === 0}
-          style={{
-            marginTop: '10px',
-            padding: '18px',
-            borderRadius: '14px',
-            border: 'none',
-            background: (loading || !dataset || columns.length === 0) ? 'rgba(255,255,255,0.1)' : 'linear-gradient(90deg, #ff6a00, #ff8c00)',
-            color: '#fff',
-            fontSize: '1rem',
-            fontWeight: 700,
-            cursor: (loading || !dataset || columns.length === 0) ? 'not-allowed' : 'pointer',
-            boxShadow: (loading || !dataset || columns.length === 0) ? 'none' : '0 8px 25px rgba(255,106,0,0.25)',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px'
-          }}
-          onMouseEnter={(e) => { if(!loading && dataset && columns.length > 0) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 12px 35px rgba(255,106,0,0.4)'; } }}
-          onMouseLeave={(e) => { if(!loading && dataset && columns.length > 0) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 8px 25px rgba(255,106,0,0.25)'; } }}
-        >
-          {loading ? '⏳ Processing...' : (dataset ? '🚀 Apply Preprocessing' : '⚠️ Please Upload CSV First')}
-        </button>
-
       </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="section-title">Encoding</div>
+        <div className="chip-group">
+          {['Label Encoding', 'One-Hot Encoding'].map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={`chip ${encoding === type ? 'is-active' : ''}`}
+              onClick={() => setEncoding(type)}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="section-title">Feature Scaling</div>
+        <div className="chip-group">
+          {['None', 'StandardScaler', 'MinMaxScaler'].map((type) => (
+            <button
+              key={type}
+              type="button"
+              className={`chip ${scaling === type ? 'is-active' : ''}`}
+              onClick={() => setScaling(type)}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div className="section-title">Train-Test Split</div>
+        <div className="form-row form-row-2">
+          <div className="form-group">
+            <label>Test Size: {testSize}%</label>
+            <input
+              type="range"
+              min="10"
+              max="50"
+              value={testSize}
+              onChange={(e) => setTestSize(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label>Random State</label>
+            <input
+              type="number"
+              value={randomState}
+              onChange={(e) => setRandomState(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      {warnings.length ? (
+        <div className="alert alert-warning">
+          {warnings.join(' ')}
+        </div>
+      ) : null}
+      {error && <div className="alert alert-warning">{error}</div>}
+      {success && <div className="alert alert-success">Preprocessing complete. Supervised models are now unlocked.</div>}
+
+      <button
+        type="button"
+        className="btn btn-primary btn-block"
+        onClick={handleApply}
+        disabled={loading || columns.length === 0}
+      >
+        {loading ? 'Processing...' : 'Apply Preprocessing'}
+      </button>
     </div>
-  );
+  )
 }

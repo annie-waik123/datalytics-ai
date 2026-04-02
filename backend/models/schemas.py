@@ -3,7 +3,7 @@ Pydantic schemas for request/response models.
 """
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ── Requests ─────────────────────────────────────────────────────────────────
@@ -29,14 +29,104 @@ class PredictRequest(BaseModel):
 
 
 class VisualizationRequest(BaseModel):
-    viz_type: str
+    chart_key: Optional[str] = None
+    chart_type: Optional[str] = None
+    viz_type: Optional[str] = None
+    columns: List[str] = []
     selected_columns: List[str] = []
     color_column: Optional[str] = None
     x_column: Optional[str] = None
     y_column: Optional[str] = None
     column: Optional[str] = None
+    date_column: Optional[str] = None
+    value_column: Optional[str] = None
+    size_column: Optional[str] = None
     bins: int = 30
     group_column: Optional[str] = None
+    rolling_window: int = 7
+    theme: str = "dark"
+
+
+class VisualizationBatchRequest(BaseModel):
+    charts: List[VisualizationRequest]
+
+
+class VisualizationSyncRequest(BaseModel):
+    rows: List[Dict[str, Any]]
+    columns: List[str] = []
+    name: Optional[str] = None
+    meta: Dict[str, Any] = {}
+    replace_original: bool = False
+
+
+class DashboardFilter(BaseModel):
+    column: str
+    value: Any
+
+
+class DashboardFieldMapping(BaseModel):
+    x_axis: Optional[str] = None
+    y_axis: Optional[str] = None
+    values: List[str] = Field(default_factory=list)
+    legend: Optional[str] = None
+    tooltip: List[str] = Field(default_factory=list)
+    size: Optional[str] = None
+    color: Optional[str] = None
+    details: Optional[str] = None
+    rows: List[str] = Field(default_factory=list)
+    columns: List[str] = Field(default_factory=list)
+    aggregation: str = "sum"
+    title: Optional[str] = None
+
+
+class DashboardWidgetRequest(BaseModel):
+    widget_id: Optional[str] = None
+    chart_type: str = "auto"
+    mapping: DashboardFieldMapping = Field(default_factory=DashboardFieldMapping)
+    filters: List[DashboardFilter] = Field(default_factory=list)
+    drill_column: Optional[str] = None
+    drill_value: Optional[Any] = None
+    theme: str = "dark"
+
+
+class DashboardSuggestRequest(BaseModel):
+    chart_type: Optional[str] = "auto"
+    selected_columns: List[str] = Field(default_factory=list)
+    theme: str = "dark"
+
+
+class DashboardSaveRequest(BaseModel):
+    name: Optional[str] = None
+    dataset_name: Optional[str] = None
+    theme: str = "dark"
+    widgets: List[Dict[str, Any]] = Field(default_factory=list)
+    selected_widget_id: Optional[str] = None
+    cross_filter: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EDAChartRequest(BaseModel):
+    chart_type: str
+    x_column: Optional[str] = None
+    y_column: Optional[str] = None
+    color_column: Optional[str] = None
+    z_column: Optional[str] = None
+    bins: int = 24
+    aggregation: str = "mean"
+    rolling_window: int = 7
+    theme: str = "dark"
+
+
+class EDAActionRequest(BaseModel):
+    action: str
+    options: Dict[str, Any] = {}
+
+
+class EDASyncRequest(BaseModel):
+    rows: List[Dict[str, Any]]
+    columns: List[str] = []
+    name: Optional[str] = None
+    meta: Dict[str, Any] = {}
+    replace_original: bool = False
 
 
 # ── Responses ─────────────────────────────────────────────────────────────────

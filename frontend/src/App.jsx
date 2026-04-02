@@ -1,35 +1,40 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import Sidebar from './components/Sidebar.jsx'
+import AppErrorBoundary from './components/AppErrorBoundary.jsx'
+import GlobalRuntimeGuard from './components/GlobalRuntimeGuard.jsx'
 import UploadStep from './components/UploadStep.jsx'
-import ExploreStep from './components/ExploreStep.jsx'
-import VisualizationStep from './components/VisualizationStep.jsx'
-import PredictionStep from './components/PredictionStep.jsx'
-import PreprocessStep from './components/PreprocessStep.jsx'
-import ModernPreprocess from './components/ModernPreprocess.jsx'
+import DataPreparationStep from './components/DataPreparationStep.jsx'
+import OnClickPred from './components/onclickpred.jsx'
 import TrainStep from './components/TrainStep.jsx'
 import UnsupervisedStep from './components/UnsupervisedStep.jsx'
 import BestModelStep from './components/BestModelStep.jsx'
 import PredictStep from './components/PredictStep.jsx'
 import DownloadStep from './components/DownloadStep.jsx'
-import OnClickPred from './components/onclickpred.jsx'
-import PowerBIDashboardStep from './components/PowerBIDashboardStep.jsx'
-import RecommendationStep from './components/RecommendationStep.jsx'
-import ReportStep from './components/ReportStep.jsx'
-import AIInsightsStep from './components/AIInsightsStep.jsx'
-import ChatBot from './components/ChatBot.jsx'
-import { buildDatasetProfile } from './lib/dataUtils.js'
+// import { useAuth } from './auth/AuthContext.jsx'
+import { useDataset } from './hooks/useDataset.js'
+import { ToastProvider } from './hooks/useToast.js'
+
+const ExploreStep = lazy(() => import('./components/ExploreStep.jsx'))
+const VisualizationStep = lazy(() => import('./components/VisualizationStep.jsx'))
+const PowerBIDashboardStep = lazy(() => import('./components/PowerBIDashboardStep.jsx'))
+const RecommendationStep = lazy(() => import('./components/RecommendationStep.jsx'))
+const ReportStep = lazy(() => import('./components/ReportStep.jsx'))
+const AIInsightsStep = lazy(() => import('./components/AIInsightsStep.jsx'))
+const UserProfileStep = lazy(() => import('./components/profile/UserProfileStep.jsx'))
+const ChatBot = lazy(() => import('./components/ChatBot.jsx'))
 
 const DEFAULT_COMPLETED = {
   upload: false,
+  preparation: false,
   exploration: false,
   visualization: false,
   prediction: false,
   powerbi: false,
   recommendations: false,
   reports: false,
-  aiInsights: false
+  aiInsights: false,
 }
 
 const DEFAULT_PREDICTION_STATE = {
@@ -37,11 +42,11 @@ const DEFAULT_PREDICTION_STATE = {
     linear: { status: 'idle', progress: 0, metrics: null },
     logistic: { status: 'idle', progress: 0, metrics: null },
     tree: { status: 'idle', progress: 0, metrics: null },
-    forest: { status: 'idle', progress: 0, metrics: null }
+    forest: { status: 'idle', progress: 0, metrics: null },
   },
   unsupervised: {
     kmeans: { status: 'idle', progress: 0, metrics: null },
-    pca: { status: 'idle', progress: 0, metrics: null }
+    pca: { status: 'idle', progress: 0, metrics: null },
   },
   bestModel: null,
   selectedModel: 'Random Forest',
@@ -54,67 +59,130 @@ const DEFAULT_PREDICTION_STATE = {
     unsupervised: false,
     best: false,
     predict: false,
-    download: false
-  }
+    download: false,
+  },
+}
+
+const DEFAULT_PREDICTION_STATUS = {
+  preprocessing_done: false,
+  supervised_done: false,
+  unsupervised_done: false,
+  best_done: false,
+  predict_done: false,
+  download_done: false,
+  preprocess_data: null,
+  has_predictions: false,
+}
+
+const DEFAULT_DASHBOARD_STATE = {
+  themeMode: 'dark',
+  interactionMode: 'cross-filter',
+  selectedWidgetId: null,
+  crossFilter: null,
+  widgets: [],
 }
 
 function normalizeDataset(dataset) {
   if (!dataset) return null
-  const rows = dataset.rows || []
-  const columns = dataset.columns || (rows[0] ? Object.keys(rows[0]) : [])
-  return { name: dataset.name || 'Dataset', rows, columns }
+  const rows = dataset.rows || dataset.sample_rows || dataset.preview || []
+  const columns = dataset.columns || dataset.all_columns || (rows[0] ? Object.keys(rows[0]) : [])
+  return {
+    name: dataset.name || 'Dataset',
+    rows,
+    columns,
+    meta: dataset.meta || dataset,
+  }
+}
+
+function setDatasetSyncState(dataset, { backendManaged, needsBackendSync }) {
+  if (!dataset) return dataset
+  return {
+    ...dataset,
+    meta: {
+      ...(dataset.meta || {}),
+      backend_managed: backendManaged,
+      needs_backend_sync: needsBackendSync,
+    },
+  }
+}
+
+function StepLoader({ label }) {
+  return (
+    <div className="card">
+      <div className="section-title">Loading {label}</div>
+      <p style={{ marginTop: '0.6rem', color: 'var(--text-secondary, #94a3b8)' }}>
+        Preparing this workspace without changing your current layout.
+      </p>
+    </div>
+  )
 }
 
 function getStepLabel(step) {
   const labels = {
     upload: 'Dataset Upload',
+    preparation: 'Data Preparation',
     exploration: 'Data Exploration',
     visualization: 'Visualization',
     prediction: 'Prediction',
     powerbi: 'Auto Power BI Dashboard',
     recommendations: 'Recommendations & Insights',
     reports: 'Reports',
-    aiInsights: 'AI Insights'
+    aiInsights: 'AI Insights',
+    profile: 'Profile',
   }
   return labels[step] || 'Dashboard'
 }
 
-export default function App() {
+function AppShell() {
+  const { dataset, profile: datasetProfile, setDataset, clearDataset } = useDataset()
+  // const { profile: authProfile } = useAuth()
+  const authProfile = null
   const [step, setStep] = useState('upload')
   const [completedSteps, setCompletedSteps] = useState(DEFAULT_COMPLETED)
-  const [dataset, setDataset] = useState(null)
   const [predictionModule, setPredictionModule] = useState('preprocessing')
   const [predictionState, setPredictionState] = useState(DEFAULT_PREDICTION_STATE)
-  const [predictionStatus, setPredictionStatus] = useState({
-    preprocessing_done: false,
-    supervised_done: false,
-    unsupervised_done: false,
-    best_done: false,
-    predict_done: false,
-    download_done: false,
-    preprocess_data: null
-  })
+  const [predictionStatus, setPredictionStatus] = useState(DEFAULT_PREDICTION_STATUS)
   const [vizConfig, setVizConfig] = useState({
     chartType: 'Bar',
     x: '',
     y: '',
     filterColumn: '',
-    filterValues: []
+    filterValues: [],
   })
   const [savedCharts, setSavedCharts] = useState([])
-  const [dashboardState, setDashboardState] = useState({
-    region: 'All',
-    segment: 'All',
-    year: 'All',
-    drill: ''
-  })
+  const [dashboardState, setDashboardState] = useState(DEFAULT_DASHBOARD_STATE)
+  const [incomingWidgetRequest, setIncomingWidgetRequest] = useState(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarHoverPeek, setSidebarHoverPeek] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const sidebarCloseTimerRef = useRef(null)
+  const sidebarHoverPeekRef = useRef(false)
+  const sidebarPointerFrameRef = useRef(null)
+  const immersiveSidebarAutoHide = (step === 'powerbi' || step === 'visualization') && !isMobile
 
-  const datasetProfile = useMemo(() => (
-    dataset ? buildDatasetProfile(dataset) : null
-  ), [dataset])
+  function clearSidebarCloseTimer() {
+    if (sidebarCloseTimerRef.current) {
+      window.clearTimeout(sidebarCloseTimerRef.current)
+      sidebarCloseTimerRef.current = null
+    }
+  }
+
+  function openSidebarHoverPeek() {
+    clearSidebarCloseTimer()
+    setSidebarHoverPeek((current) => {
+      if (current) return current
+      return true
+    })
+  }
+
+  function scheduleSidebarHoverClose() {
+    clearSidebarCloseTimer()
+    sidebarCloseTimerRef.current = window.setTimeout(() => {
+      setSidebarHoverPeek(false)
+      sidebarCloseTimerRef.current = null
+    }, 180)
+  }
 
   useEffect(() => {
     function syncViewport() {
@@ -129,21 +197,117 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    sidebarHoverPeekRef.current = sidebarHoverPeek
+  }, [sidebarHoverPeek])
+
+  useEffect(() => {
+    if (!immersiveSidebarAutoHide) {
+      clearSidebarCloseTimer()
+      setSidebarHoverPeek(false)
+    }
+  }, [immersiveSidebarAutoHide])
+
+  useEffect(() => {
+    return () => {
+      clearSidebarCloseTimer()
+      if (sidebarPointerFrameRef.current) {
+        cancelAnimationFrame(sidebarPointerFrameRef.current)
+        sidebarPointerFrameRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!immersiveSidebarAutoHide) return undefined
+
+    function handlePointerMove(event) {
+      const pointerX = event.clientX
+      if (sidebarPointerFrameRef.current) {
+        cancelAnimationFrame(sidebarPointerFrameRef.current)
+      }
+
+      sidebarPointerFrameRef.current = requestAnimationFrame(() => {
+        sidebarPointerFrameRef.current = null
+
+        const nearEdge = pointerX <= 18
+        const withinSidebarZone = pointerX <= 308
+
+        if (nearEdge || (sidebarHoverPeekRef.current && withinSidebarZone)) {
+          openSidebarHoverPeek()
+          return
+        }
+
+        scheduleSidebarHoverClose()
+      })
+    }
+
+    function handlePointerLeaveWindow(event) {
+      if (event.relatedTarget) return
+      scheduleSidebarHoverClose()
+    }
+
+    window.addEventListener('mousemove', handlePointerMove, { passive: true })
+    window.addEventListener('mouseout', handlePointerLeaveWindow)
+
+    return () => {
+      window.removeEventListener('mousemove', handlePointerMove)
+      window.removeEventListener('mouseout', handlePointerLeaveWindow)
+      if (sidebarPointerFrameRef.current) {
+        cancelAnimationFrame(sidebarPointerFrameRef.current)
+        sidebarPointerFrameRef.current = null
+      }
+    }
+  }, [immersiveSidebarAutoHide])
+
+  useEffect(() => {
+    function handleChatWidgetRequest(event) {
+      const detail = event?.detail
+      if (!detail) return
+      setIncomingWidgetRequest({
+        ...detail,
+        requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      })
+      setStep('powerbi')
+      setCompletedSteps((prev) => ({ ...prev, powerbi: true }))
+      if (isMobile) setSidebarOpen(false)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+
+    window.addEventListener('datalytics:create-dashboard-widget', handleChatWidgetRequest)
+    return () => window.removeEventListener('datalytics:create-dashboard-widget', handleChatWidgetRequest)
+  }, [isMobile])
+
+  useEffect(() => {
+    if (dataset && !completedSteps.upload) {
+      setCompletedSteps((prev) => ({ ...prev, upload: true }))
+    }
+  }, [dataset, completedSteps.upload])
+
+  useEffect(() => {
     if (!datasetProfile) return
     const defaultX = datasetProfile.categoricalColumns[0] || datasetProfile.columns[0] || ''
     const defaultY = datasetProfile.numericColumns[0] || datasetProfile.columns[1] || datasetProfile.columns[0] || ''
-    setVizConfig(prev => ({
+    setVizConfig((prev) => ({
       ...prev,
       x: prev.x || defaultX,
       y: prev.y || defaultY,
-      filterColumn: prev.filterColumn || defaultX
+      filterColumn: prev.filterColumn || defaultX,
     }))
 
-    setDashboardState(prev => ({
-      ...prev,
-      drill: prev.drill || (datasetProfile.categoricalColumns[0] || defaultX)
-    }))
   }, [datasetProfile])
+
+  useEffect(() => {
+    const predictionDone = Boolean(
+      predictionStatus.supervised_done ||
+        predictionStatus.unsupervised_done ||
+        predictionStatus.best_done ||
+        predictionStatus.predict_done ||
+        predictionStatus.download_done
+    )
+    if (predictionDone && !completedSteps.prediction) {
+      setCompletedSteps((prev) => ({ ...prev, prediction: true }))
+    }
+  }, [predictionStatus, completedSteps.prediction])
 
   function handleStepChange(nextStep) {
     setStep(nextStep)
@@ -152,49 +316,102 @@ export default function App() {
   }
 
   function markComplete(stepKey) {
-    setCompletedSteps(prev => ({ ...prev, [stepKey]: true }))
+    setCompletedSteps((prev) => ({ ...prev, [stepKey]: true }))
   }
 
   function handleDatasetChange(nextDataset) {
     const normalized = normalizeDataset(nextDataset)
     setDataset(normalized)
     setPredictionState(DEFAULT_PREDICTION_STATE)
-    setPredictionModule('supervised')
+    setPredictionModule('preprocessing')
+    setPredictionStatus(DEFAULT_PREDICTION_STATUS)
     setSavedCharts([])
     setVizConfig({ chartType: 'Bar', x: '', y: '', filterColumn: '', filterValues: [] })
-    setDashboardState({ region: 'All', segment: 'All', year: 'All', drill: '' })
+    setDashboardState(DEFAULT_DASHBOARD_STATE)
+    setIncomingWidgetRequest(null)
     setCompletedSteps({ ...DEFAULT_COMPLETED, upload: Boolean(normalized) })
   }
 
-  function handleResetWorkflow() {
-    setDataset(null)
+  function handlePreparationContinue(nextDataset, hasChanges) {
+    if (hasChanges) {
+      const normalized = setDatasetSyncState(normalizeDataset(nextDataset), {
+        backendManaged: false,
+        needsBackendSync: true,
+      })
+      setDataset(normalized)
+      setPredictionState(DEFAULT_PREDICTION_STATE)
+      setPredictionModule('preprocessing')
+      setPredictionStatus(DEFAULT_PREDICTION_STATUS)
+      setSavedCharts([])
+      setVizConfig({ chartType: 'Bar', x: '', y: '', filterColumn: '', filterValues: [] })
+      setDashboardState(DEFAULT_DASHBOARD_STATE)
+      setIncomingWidgetRequest(null)
+      setCompletedSteps({
+        ...DEFAULT_COMPLETED,
+        upload: Boolean(normalized),
+        preparation: Boolean(normalized),
+      })
+    } else {
+      setCompletedSteps((prev) => ({ ...prev, preparation: Boolean(nextDataset) }))
+    }
+
+    setStep('exploration')
+    if (isMobile) setSidebarOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function handleExplorationDatasetUpdate(nextDataset) {
+    const normalized = setDatasetSyncState(normalizeDataset(nextDataset), {
+      backendManaged: true,
+      needsBackendSync: false,
+    })
+    setDataset(normalized)
     setPredictionState(DEFAULT_PREDICTION_STATE)
-    setPredictionModule('supervised')
+    setPredictionModule('preprocessing')
+    setPredictionStatus(DEFAULT_PREDICTION_STATUS)
     setSavedCharts([])
     setVizConfig({ chartType: 'Bar', x: '', y: '', filterColumn: '', filterValues: [] })
-    setDashboardState({ region: 'All', segment: 'All', year: 'All', drill: '' })
+    setDashboardState(DEFAULT_DASHBOARD_STATE)
+    setIncomingWidgetRequest(null)
+    setCompletedSteps({
+      ...DEFAULT_COMPLETED,
+      upload: Boolean(normalized),
+      preparation: Boolean(normalized),
+      exploration: Boolean(normalized),
+    })
+  }
+
+  function handleResetWorkflow() {
+    clearDataset()
+    setPredictionState(DEFAULT_PREDICTION_STATE)
+    setPredictionModule('preprocessing')
+    setPredictionStatus(DEFAULT_PREDICTION_STATUS)
+    setSavedCharts([])
+    setVizConfig({ chartType: 'Bar', x: '', y: '', filterColumn: '', filterValues: [] })
+    setDashboardState(DEFAULT_DASHBOARD_STATE)
+    setIncomingWidgetRequest(null)
     setCompletedSteps(DEFAULT_COMPLETED)
     setStep('upload')
     setSidebarOpen(false)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const PREDICTION_MODULES = [
+  const predictionModules = [
     { key: 'preprocessing', label: 'Data Preprocessing', icon: '01' },
     { key: 'supervised', label: 'Supervised Models', icon: '02' },
     { key: 'unsupervised', label: 'Unsupervised Models', icon: '03' },
     { key: 'best', label: 'Best Model Selection', icon: '04' },
     { key: 'predict', label: 'Prediction', icon: '05' },
-    { key: 'download', label: 'Download Results', icon: '06' }
+    { key: 'download', label: 'Download Results', icon: '06' },
   ]
 
-  const PRED_STATUS_MAP = {
+  const predictionStatusMap = {
     preprocessing: 'preprocessing_done',
     supervised: 'supervised_done',
     unsupervised: 'unsupervised_done',
     best: 'best_done',
     predict: 'predict_done',
-    download: 'download_done'
+    download: 'download_done',
   }
 
   function renderPredictionContent() {
@@ -211,7 +428,7 @@ export default function App() {
           <TrainStep
             preprocessData={predictionStatus.preprocess_data}
             status={predictionStatus}
-            onTrained={() => setPredictionStatus(s => ({ ...s, supervised_done: true }))}
+            onTrained={() => setPredictionStatus((s) => ({ ...s, supervised_done: true }))}
             setStatus={setPredictionStatus}
           />
         )
@@ -226,6 +443,7 @@ export default function App() {
         return (
           <BestModelStep
             status={predictionStatus}
+            setStatus={setPredictionStatus}
           />
         )
       case 'predict':
@@ -242,6 +460,7 @@ export default function App() {
             trainData={predictionStatus.preprocess_data}
             preprocessData={predictionStatus.preprocess_data}
             status={predictionStatus}
+            setStatus={setPredictionStatus}
           />
         )
       default:
@@ -258,9 +477,9 @@ export default function App() {
             <span className="prediction-subnav-sub">ML Pipeline</span>
           </div>
           <nav className="prediction-subnav-list">
-            {PREDICTION_MODULES.map((mod, idx) => {
+            {predictionModules.map((mod) => {
               const isActive = predictionModule === mod.key
-              const isDone = predictionStatus[PRED_STATUS_MAP[mod.key]]
+              const isDone = predictionStatus[predictionStatusMap[mod.key]]
               return (
                 <button
                   key={mod.key}
@@ -268,7 +487,7 @@ export default function App() {
                   className={`pred-subnav-item${isActive ? ' is-active' : ''}${isDone ? ' is-done' : ''}`}
                   onClick={() => {
                     setPredictionModule(mod.key)
-                    setPredictionStatus(s => ({ ...s, current_module: mod.key }))
+                    setPredictionStatus((s) => ({ ...s, current_module: mod.key }))
                   }}
                 >
                   <span className="pred-subnav-step">{mod.icon}</span>
@@ -295,71 +514,112 @@ export default function App() {
             datasetProfile={datasetProfile}
             onDatasetChange={handleDatasetChange}
             onComplete={markComplete}
+            onReset={handleResetWorkflow}
+          />
+        )
+      case 'preparation':
+        return (
+          <DataPreparationStep
+            dataset={dataset}
+            datasetProfile={datasetProfile}
+            onContinue={handlePreparationContinue}
+            onJumpToUpload={() => handleStepChange('upload')}
           />
         )
       case 'exploration':
         return (
-          <ExploreStep
-            dataset={dataset}
-            datasetProfile={datasetProfile}
-            explorationReady={completedSteps.exploration}
-            onComplete={markComplete}
-            onJumpToUpload={() => handleStepChange('upload')}
-          />
+          <Suspense fallback={<StepLoader label="exploration" />}>
+            <ExploreStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              explorationReady={completedSteps.exploration}
+              onComplete={markComplete}
+              onDatasetUpdate={handleExplorationDatasetUpdate}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
         )
       case 'visualization':
         return (
-          <VisualizationStep
-            dataset={dataset}
-            datasetProfile={datasetProfile}
-            vizConfig={vizConfig}
-            setVizConfig={setVizConfig}
-            onAddChart={chart => setSavedCharts(prev => [chart, ...prev].slice(0, 6))}
-            onComplete={markComplete}
-            onJumpToUpload={() => handleStepChange('upload')}
-          />
+          <Suspense fallback={<StepLoader label="visualization" />}>
+            <VisualizationStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              vizConfig={vizConfig}
+              setVizConfig={setVizConfig}
+              onAddChart={(chart) => setSavedCharts((prev) => [chart, ...prev].slice(0, 8))}
+              onComplete={markComplete}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
         )
       case 'prediction':
         return renderPrediction()
       case 'powerbi':
         return (
-          <PowerBIDashboardStep
-            dataset={dataset}
-            datasetProfile={datasetProfile}
-            savedCharts={savedCharts}
-            dashboardState={dashboardState}
-            setDashboardState={setDashboardState}
-            onComplete={markComplete}
-            onJumpToUpload={() => handleStepChange('upload')}
-          />
+          <Suspense fallback={<StepLoader label="dashboard builder" />}>
+            <PowerBIDashboardStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              savedCharts={savedCharts}
+              dashboardState={dashboardState}
+              incomingWidgetRequest={incomingWidgetRequest}
+              setDashboardState={setDashboardState}
+              onComplete={markComplete}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
         )
       case 'recommendations':
         return (
-          <RecommendationStep
-            dataset={dataset}
-            datasetProfile={datasetProfile}
-            onComplete={markComplete}
-            onJumpToUpload={() => handleStepChange('upload')}
-          />
+          <Suspense fallback={<StepLoader label="recommendations" />}>
+            <RecommendationStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              onComplete={markComplete}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
         )
       case 'reports':
         return (
-          <ReportStep
-            dataset={dataset}
-            datasetProfile={datasetProfile}
-            predictionState={predictionState}
-            onComplete={markComplete}
-            onJumpToUpload={() => handleStepChange('upload')}
-          />
+          <Suspense fallback={<StepLoader label="reports" />}>
+            <ReportStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              predictionStatus={predictionStatus}
+              vizConfig={vizConfig}
+              savedCharts={savedCharts}
+              onComplete={markComplete}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
         )
       case 'aiInsights':
         return (
-          <AIInsightsStep
-            dataset={dataset}
-            datasetProfile={datasetProfile}
-            onComplete={markComplete}
-            onJumpToUpload={() => handleStepChange('upload')}
-          />
+          <Suspense fallback={<StepLoader label="AI insights" />}>
+            <AIInsightsStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              onComplete={markComplete}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
+        )
+      case 'profile':
+        return (
+          <Suspense fallback={<StepLoader label="profile" />}>
+            <UserProfileStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              savedCharts={savedCharts}
+              dashboardState={dashboardState}
+              predictionStatus={predictionStatus}
+              completedSteps={completedSteps}
+              authProfile={authProfile}
+              onNavigate={handleStepChange}
+            />
+          </Suspense>
         )
       default:
         return null
@@ -368,9 +628,12 @@ export default function App() {
 
   const completedCount = Object.values(completedSteps).filter(Boolean).length
   const totalSteps = Object.keys(completedSteps).length
+  const profileName = authProfile?.fullName || 'Datalytics User'
+  const profileRole = authProfile?.role || 'Analytics Workspace'
+  const profileInitials = authProfile?.initials || 'DL'
 
   return (
-    <div className="app-layout">
+    <div className={`app-layout${immersiveSidebarAutoHide ? ' has-immersive-sidebar' : ''}`}>
       <Sidebar
         currentStep={step}
         setStep={handleStepChange}
@@ -381,13 +644,24 @@ export default function App() {
         predictionState={predictionState}
         dataset={dataset}
         datasetProfile={datasetProfile}
-        collapsed={sidebarCollapsed}
+        authProfile={authProfile}
+        collapsed={immersiveSidebarAutoHide ? false : sidebarCollapsed}
         mobileOpen={sidebarOpen}
+        autoHide={immersiveSidebarAutoHide}
+        hoverPeek={sidebarHoverPeek}
         onToggleCollapse={() => {
-          if (isMobile) { setSidebarOpen(v => !v); return }
-          setSidebarCollapsed(v => !v)
+          if (isMobile) {
+            setSidebarOpen((v) => !v)
+            return
+          }
+          if (immersiveSidebarAutoHide) {
+            scheduleSidebarHoverClose()
+            return
+          }
+          setSidebarCollapsed((v) => !v)
         }}
         onCloseMobile={() => setSidebarOpen(false)}
+        progress={{ completedCount, totalSteps }}
       />
 
       <div className="app-main">
@@ -396,10 +670,12 @@ export default function App() {
             <button
               type="button"
               className="topbar-menu-button"
-              onClick={() => setSidebarOpen(v => !v)}
+              onClick={() => setSidebarOpen((v) => !v)}
               aria-label="Toggle sidebar"
             >
-              <span /><span /><span />
+              <span />
+              <span />
+              <span />
             </button>
             <div className="topbar-breadcrumb">
               <span className="topbar-breadcrumb-root">Analytics Pipeline</span>
@@ -416,7 +692,7 @@ export default function App() {
               <input
                 type="text"
                 className="topbar-search-input"
-                placeholder="Search anything..."
+                placeholder="Search pipeline, metrics, or models..."
               />
             </div>
           </div>
@@ -429,31 +705,30 @@ export default function App() {
                 </svg>
                 <span className="topbar-notification-badge" />
               </button>
-              
-              <button className="topbar-action-btn" title="Settings">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-              
+
               <div className="topbar-divider" />
-              
-              <div className="topbar-profile">
-                <div className="topbar-profile-avatar">SS</div>
+
+              <div
+                className="topbar-profile"
+                role="button"
+                tabIndex={0}
+                onClick={() => handleStepChange('profile')}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    handleStepChange('profile')
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
+                title="Open profile"
+              >
+                <div className="topbar-profile-avatar">{profileInitials}</div>
                 <div className="topbar-profile-info">
-                  <span className="topbar-profile-name">Sangam Singh</span>
-                  <span className="topbar-profile-role">Data Analyst</span>
+                  <span className="topbar-profile-name">{profileName}</span>
+                  <span className="topbar-profile-role">{profileRole}</span>
                 </div>
               </div>
-              
-              <button className="topbar-action-btn" title="Logout">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
             </div>
-            
           </div>
         </header>
 
@@ -468,7 +743,21 @@ export default function App() {
         </footer>
       </div>
 
-      <ChatBot />
+      <Suspense fallback={null}>
+        <ChatBot dataset={dataset} datasetProfile={datasetProfile} />
+      </Suspense>
     </div>
+  )
+}
+
+export default function App() {
+  return (
+    <ToastProvider>
+      <GlobalRuntimeGuard>
+        <AppErrorBoundary>
+          <AppShell />
+        </AppErrorBoundary>
+      </GlobalRuntimeGuard>
+    </ToastProvider>
   )
 }

@@ -9,9 +9,10 @@ cd backend && pip install -r requirements.txt -q && cd ..
 echo "[startup] Installing Node frontend dependencies..."
 cd frontend && npm install --legacy-peer-deps -q && cd ..
 
-# Start the FastAPI backend in the background
-echo "[startup] Starting FastAPI backend on port 8000..."
-cd backend && uvicorn main:app --host 0.0.0.0 --port 8000 &
+# Start the FastAPI backend in the background with reload so new routers
+# and backend changes are picked up during development.
+echo "[startup] Starting FastAPI backend on port 8000 (reload enabled)..."
+cd backend && uvicorn main:app --host 0.0.0.0 --port 8000 --reload &
 BACKEND_PID=$!
 cd ..
 

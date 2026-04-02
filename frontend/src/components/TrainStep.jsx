@@ -170,8 +170,8 @@ function BestMetrics({ metrics, taskType }) {
         ['CV Mean', metrics['CV Mean']],
       ]
     : [
-        ['R² Score', metrics['R2 Score']],
-        ['CV Mean R²', metrics['CV Mean R2']],
+        ['R2 Score', metrics['R2 Score']],
+        ['CV Mean R2', metrics['CV Mean R2']],
         ['RMSE', metrics.RMSE],
         ['MAE', metrics.MAE],
       ]
@@ -193,7 +193,7 @@ function TuningSummary({ metrics, taskType }) {
     return null
   }
 
-  const tuningLabel = taskType === 'Classification' ? 'Best CV Accuracy' : 'Best CV R²'
+  const tuningLabel = taskType === 'Classification' ? 'Best CV Accuracy' : 'Best CV R2'
   const tuningScore = metrics['Tuning Score']
 
   return (
@@ -368,10 +368,9 @@ function shouldUsePercentage(metricLabel, value) {
 function displayMetricLabel(label) {
   if (!label) return label
   const map = {
-    'R2 Score': 'R² Score',
-    'CV Mean R2': 'CV Mean R²',
-    'Best CV R2': 'Best CV R²',
+    'R2 Score': 'R2 Score',
+    'CV Mean R2': 'CV Mean R2',
+    'Best CV R2': 'Best CV R2',
   }
   return map[label] || label
 }
-

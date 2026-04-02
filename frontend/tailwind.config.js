@@ -6,7 +6,15 @@ const config = {
     './src/**/*.{js,jsx,ts,tsx,mdx}',
   ],
   theme: {
-    extend: {},
+    extend: {
+      colors: {
+        primary: '#FF6B35',
+        surface: '#0d1117',
+      },
+      fontFamily: {
+        display: ['Space Grotesk', 'Poppins', 'sans-serif'],
+      },
+    },
   },
   plugins: [],
 }

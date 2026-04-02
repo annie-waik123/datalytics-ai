@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../api/client.js'
 import PlotFigure from './PlotFigure.jsx'
 
-export default function BestModelStep({ status }) {
+export default function BestModelStep({ status, setStatus }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -22,6 +22,9 @@ export default function BestModelStep({ status }) {
         const res = await client.get('/best-model-summary')
         if (!cancelled) {
           setData(res.data)
+          if (setStatus) {
+            setStatus((prev) => ({ ...prev, best_done: true }))
+          }
         }
       } catch (e) {
         try {
@@ -34,6 +37,9 @@ export default function BestModelStep({ status }) {
               task_type: fallback.data.task_type,
               learning_curve: null,
             })
+            if (setStatus) {
+              setStatus((prev) => ({ ...prev, best_done: true }))
+            }
           }
         } catch (fallbackError) {
           if (!cancelled) {
@@ -55,7 +61,7 @@ export default function BestModelStep({ status }) {
     return () => {
       cancelled = true
     }
-  }, [status.supervised_done])
+  }, [status.supervised_done, setStatus])
 
   if (!status.supervised_done) {
     return <div className="alert alert-warning">Train supervised models first.</div>
@@ -72,6 +78,9 @@ export default function BestModelStep({ status }) {
   const taskType = data.task_type || status.task_type
   const metricEntries = getPriorityMetrics(data.best_metrics || {}, taskType)
   const resultRows = data.results || []
+  const featureImportance = data.feature_importance || []
+  const confusionMatrix = data.confusion_matrix
+  const confusionLabels = data.confusion_labels || []
 
   return (
     <div>
@@ -91,6 +100,20 @@ export default function BestModelStep({ status }) {
           </div>
         ))}
       </div>
+
+      {featureImportance.length > 0 && (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <div className="section-title">Feature Importance</div>
+          <FeatureImportance items={featureImportance} />
+        </div>
+      )}
+
+      {confusionMatrix && confusionLabels.length > 0 && (
+        <div className="card confusion-matrix" style={{ marginBottom: '1rem' }}>
+          <div className="section-title">Confusion Matrix</div>
+          <ConfusionMatrix matrix={confusionMatrix} labels={confusionLabels} />
+        </div>
+      )}
 
       {data.learning_curve && (
         <div className="card" style={{ marginBottom: '1rem' }}>
@@ -135,11 +158,68 @@ function getPriorityMetrics(metrics, taskType) {
   }
 
   return [
-    ['R² Score', metrics['R2 Score']],
-    ['CV Mean R²', metrics['CV Mean R2']],
+    ['R2 Score', metrics['R2 Score']],
+    ['CV Mean R2', metrics['CV Mean R2']],
     ['RMSE', metrics.RMSE],
     ['MAE', metrics.MAE],
   ]
+}
+
+function FeatureImportance({ items }) {
+  const normalized = items.map((item) => ({
+    ...item,
+    value: Number(item.importance) || 0,
+  }))
+  const maxValue = Math.max(...normalized.map((item) => item.value), 0.0001)
+
+  return (
+    <div className="feature-importance-list">
+      {normalized.map((item) => (
+        <div key={item.feature} className="feature-importance-item">
+          <span className="feature-importance-label">{item.feature}</span>
+          <div className="feature-importance-bar">
+            <div
+              className="feature-importance-fill"
+              style={{ width: `${(item.value / maxValue) * 100}%` }}
+            />
+          </div>
+          <span className="feature-importance-value">{item.value.toFixed(3)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ConfusionMatrix({ matrix, labels }) {
+  return (
+    <div>
+      <div className="confusion-matrix-title">Actual vs Predicted</div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Actual \\ Predicted</th>
+              {labels.map((label) => (
+                <th key={`pred-${label}`}>{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, rowIndex) => (
+              <tr key={`row-${rowIndex}`}>
+                <td><strong>{labels[rowIndex]}</strong></td>
+                {row.map((value, colIndex) => (
+                  <td key={`cell-${rowIndex}-${colIndex}`} className={rowIndex === colIndex ? 'best' : ''}>
+                    {value}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 function formatTableValue(value, column) {

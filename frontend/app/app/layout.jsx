@@ -1,4 +1,7 @@
 import '../../src/index.css'
+import '../../src/eda.css'
+import '../../src/visualization.css'
+import '../../src/powerbi-builder.css'
 
 export const metadata = {
   title: 'Dashboard',

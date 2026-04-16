@@ -1,0 +1,616 @@
+.viz-workspace {
+  --viz-bg: #0b1120;
+  --viz-surface: #121a2a;
+  --viz-surface-soft: #192235;
+  --viz-panel: #0f1726;
+  --viz-border: rgba(148, 163, 184, 0.18);
+  --viz-text: #eef4ff;
+  --viz-text-soft: #c1d0e8;
+  --viz-text-muted: #8ea2bf;
+  --viz-accent: #ff6a00;
+  --viz-accent-soft: rgba(255, 106, 0, 0.12);
+  --viz-success: #22c55e;
+  --viz-warning: #f59e0b;
+  --viz-shadow: 0 24px 60px rgba(2, 6, 23, 0.28);
+  color: var(--viz-text);
+}
+
+.viz-workspace.is-light {
+  --viz-bg: #eef3f8;
+  --viz-surface: #ffffff;
+  --viz-surface-soft: #f7fafc;
+  --viz-panel: #f8fbff;
+  --viz-border: rgba(15, 23, 42, 0.1);
+  --viz-text: #0f172a;
+  --viz-text-soft: #334155;
+  --viz-text-muted: #64748b;
+  --viz-accent-soft: rgba(255, 106, 0, 0.08);
+  --viz-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
+.viz-toolbar-card,
+.viz-featured-card,
+.viz-card {
+  border: 1px solid var(--viz-border);
+  background: var(--viz-surface);
+  border-radius: 22px;
+  box-shadow: var(--viz-shadow);
+}
+
+.viz-toolbar-card {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(240px, 1.2fr);
+  gap: 1rem;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.5rem;
+}
+
+.viz-toolbar-stat,
+.viz-toolbar-select label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.viz-toolbar-stat span,
+.viz-toolbar-select span,
+.viz-field span,
+.viz-multi-meta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--viz-text-muted);
+}
+
+.viz-toolbar-stat strong {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--viz-text);
+}
+
+.viz-toolbar-select select,
+.viz-field select {
+  height: 44px;
+}
+
+.viz-toolbar-select select,
+.viz-field select,
+.viz-multi-select summary {
+  width: 100%;
+  border: 1px solid var(--viz-border);
+  background: var(--viz-panel);
+  border-radius: 14px;
+  color: var(--viz-text);
+  padding: 0.75rem 0.9rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.viz-toolbar-select select:focus,
+.viz-field select:focus,
+.viz-multi-select summary:focus {
+  outline: none;
+  border-color: rgba(255, 106, 0, 0.45);
+}
+
+.viz-inline-note {
+  border-radius: 14px;
+  border: 1px solid var(--viz-border);
+  background: var(--viz-surface-soft);
+  padding: 0.75rem 0.9rem;
+  color: var(--viz-text-soft);
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.viz-inline-note.is-warning {
+  border-color: rgba(245, 158, 11, 0.28);
+  color: #f59e0b;
+}
+
+.viz-featured-card {
+  padding: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+.viz-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  width: 100%;
+}
+
+.viz-main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.viz-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  width: 100%;
+}
+
+/* Add Premium Gradients for Chart Cards */
+.viz-batch-card {
+  width: 100%;
+  padding: 1.5rem;
+  background: linear-gradient(145deg, #0f172a, #1e293b) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 26px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+  display: flex; flex-direction: column;
+  gap: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.viz-batch-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--viz-accent) !important;
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6) !important;
+}
+
+.viz-batch-preview {
+  width: 100%;
+  max-width: 700px;
+  height: 500px;
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: hidden;
+  background: var(--viz-panel);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.viz-card-controls-inline {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.015);
+  padding: 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.viz-card-controls-inline.is-single {
+  grid-template-columns: 1fr;
+}
+
+.viz-field-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.viz-field-inline span {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--viz-text-muted);
+}
+
+.viz-field-inline select {
+  background: #121a2a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  width: 100%;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='white'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 1rem;
+}
+
+.viz-field-inline select:hover {
+  border-color: var(--viz-accent);
+  background-color: #1a2438;
+}
+
+.viz-field-inline select option {
+  background: #121a2a;
+  color: #ffffff;
+  padding: 10px;
+}
+
+.viz-card {
+  padding: 1.15rem;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.viz-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 106, 0, 0.2);
+}
+
+.viz-card.is-disabled {
+  opacity: 0.72;
+}
+
+.viz-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.viz-card-head h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--viz-text);
+  margin: 0;
+}
+
+.viz-card-head p {
+  color: var(--viz-text-muted);
+  margin: 0.25rem 0 0;
+  line-height: 1.4;
+  font-size: 0.75rem;
+}
+
+.viz-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.viz-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  background: var(--viz-accent-soft);
+  color: var(--viz-accent);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.viz-pill-muted {
+  background: var(--viz-surface-soft);
+  color: var(--viz-text-muted);
+}
+
+.viz-pill-accent {
+  background: var(--viz-accent);
+  color: white;
+}
+
+.viz-card-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.viz-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.viz-field-span {
+  grid-column: 1 / -1;
+}
+
+.viz-multi-select {
+  position: relative;
+}
+
+.viz-multi-select summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.viz-multi-select summary::-webkit-details-marker {
+  display: none;
+}
+
+.viz-multi-select[open] .viz-multi-menu {
+  display: grid;
+}
+
+.viz-multi-menu {
+  position: absolute;
+  z-index: 30;
+  display: none;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.9rem;
+  border: 1px solid var(--viz-border);
+  border-radius: 16px;
+  background: var(--viz-surface);
+  box-shadow: 0 18px 50px rgba(2, 6, 23, 0.22);
+}
+
+.viz-multi-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: var(--viz-text-soft);
+  font-size: 0.92rem;
+}
+
+.viz-multi-option input {
+  accent-color: var(--viz-accent);
+}
+
+.viz-chart-shell {
+  width: 100%;
+  height: 100%;
+  min-height: auto;
+  margin: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.viz-chart-shell.is-featured {
+  width: min(100%, 882px);
+}
+
+.viz-chart-loading {
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  color: var(--viz-text-muted);
+  text-align: center;
+}
+
+.viz-sync-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(6, 10, 24, 0.8);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  gap: 2rem;
+}
+
+.viz-sync-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.viz-sync-loader {
+  width: 80px;
+  height: 80px;
+  border: 4px solid rgba(255, 107, 53, 0.1);
+  border-left-color: #ff6b35;
+  border-radius: 50%;
+  animation: viz-spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  box-shadow: 0 0 30px rgba(255, 107, 53, 0.2);
+}
+
+.viz-sync-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+
+.viz-sync-subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
+  max-width: 300px;
+  line-height: 1.5;
+}
+
+@keyframes viz-spin {
+  to { transform: rotate(360deg); }
+}
+
+.viz-spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-left-color: var(--viz-accent);
+  border-radius: 50%;
+  animation: viz-spin 0.8s linear infinite;
+}
+
+@media (max-width: 900px) {
+  .viz-batch-card {
+    width: 95vw;
+  }
+  .viz-batch-preview, .viz-chart-shell {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 3;
+  }
+}
+
+/* ── Visualization Overflow & Responsive Fixes ── */
+.viz-workspace {
+  overflow-x: hidden;
+  max-width: 100%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.viz-toolbar-card {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-toolbar-stat strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-toolbar-stat span,
+.viz-toolbar-select span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-toolbar-select select,
+.viz-field select {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.viz-featured-card {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-grid,
+.viz-main {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-batch-grid {
+  overflow: hidden;
+}
+
+.viz-batch-card {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.viz-batch-preview {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-card {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-card-head {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.viz-card-head h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.viz-card-head p {
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.viz-card-controls {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-card-controls-inline {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-pill,
+.viz-pill-muted,
+.viz-pill-accent {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+
+.viz-sync-subtitle {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  max-width: min(300px, 90vw);
+}
+
+.viz-sync-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 90vw;
+}
+
+.viz-chart-shell {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.viz-field-inline select {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* toolbar responsive */
+@media (max-width: 1100px) {
+  .viz-toolbar-card {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .viz-toolbar-card {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .viz-card-controls {
+    grid-template-columns: 1fr !important;
+  }
+
+  .viz-card-controls-inline {
+    grid-template-columns: 1fr !important;
+  }
+
+  .viz-batch-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
+  }
+
+  .viz-batch-card {
+    width: 100% !important;
+    padding: 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .viz-featured-card {
+    padding: 0.85rem !important;
+  }
+
+  .viz-card {
+    padding: 0.85rem !important;
+  }
+}
+

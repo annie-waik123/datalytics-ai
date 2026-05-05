@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { formatNumber, toNumber } from '../lib/dataUtils.js'
 import '../prediction.css'
+import CustomDropdown from './ui/CustomDropdown.jsx';
 
 const SUPERVISED_MODELS = [
   { key: 'linear', name: 'Linear Regression', type: 'Regression' },
@@ -256,14 +257,14 @@ export default function PredictionStep({
             <div className="grid-side-by-side">
               <div className="form-group">
                 <label>Target Column</label>
-                <select 
+                <CustomDropdown 
                   className="form-control-premium"
                   defaultValue={datasetProfile.columns[0]}
                 >
                   {datasetProfile.columns.map(col => (
                     <option key={col} value={col} style={{ background: '#121a2a' }}>{col}</option>
                   ))}
-                </select>
+                </CustomDropdown>
               </div>
               <div className="form-group">
                 <label>Task Type</label>

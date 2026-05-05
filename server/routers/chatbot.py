@@ -12,7 +12,14 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
+import re
 from typing import Optional
+
+# Force-load .env so GROQ_API_KEY is always available
+from dotenv import load_dotenv
+_ENV = pathlib.Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=_ENV, override=True)
 
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
@@ -24,7 +31,7 @@ from services.insight_generation_service import (
     generate_mode_response_from_session,
     infer_mode_from_prompt,
 )
-from services.llm_service import groq_chat, has_groq_config
+from services.llm_service import get_active_llm_summary, groq_chat, has_groq_config
 from state.session_store import store
 
 log = logging.getLogger(__name__)
@@ -32,9 +39,21 @@ router = APIRouter()
 
 ALLOWED_MODES = {"chat", "ai_insights", "recommendation_insights", "decision_making"}
 
+CHAT_CONTEXT_MAX_ROWS = int(os.getenv("CHATBOT_CHAT_CONTEXT_ROWS", "1000"))
+CHAT_CONTEXT_MAX_COLUMNS = int(os.getenv("CHATBOT_CHAT_CONTEXT_COLUMNS", "24"))
+CHAT_CONTEXT_MAX_CHARS = int(os.getenv("CHATBOT_CHAT_CONTEXT_CHARS", "100000"))
+INSIGHT_CONTEXT_MAX_ROWS = int(os.getenv("CHATBOT_INSIGHT_CONTEXT_ROWS", "1000"))
+INSIGHT_CONTEXT_MAX_COLUMNS = int(os.getenv("CHATBOT_INSIGHT_CONTEXT_COLUMNS", "24"))
+INSIGHT_CONTEXT_MAX_CHARS = int(os.getenv("CHATBOT_INSIGHT_CONTEXT_CHARS", "100000"))
+ANALYSIS_SAMPLE_ROWS = int(os.getenv("CHATBOT_ANALYSIS_SAMPLE_ROWS", "2500"))
+SUMMARY_NUMERIC_LIMIT = int(os.getenv("CHATBOT_SUMMARY_NUMERIC_LIMIT", "6"))
+SUMMARY_CATEGORICAL_LIMIT = int(os.getenv("CHATBOT_SUMMARY_CATEGORICAL_LIMIT", "4"))
+SUMMARY_CORRELATION_LIMIT = int(os.getenv("CHATBOT_SUMMARY_CORRELATION_LIMIT", "5"))
+CHAT_CACHE_VERSION = "strict-2026-04-18"
+
 # ─── System prompts per mode ─────────────────────────────────────────────────
 
-CHAT_SYSTEM_PROMPT = """You are a data analyst assistant for Datalytics, powered by LLaMA 3.3 70B.
+CHAT_SYSTEM_PROMPT = """You are a data analyst assistant for Datalytics.
 
 The user has uploaded the dataset shown below. Answer their question precisely based on the data.
 
@@ -49,84 +68,86 @@ Rules:
 - If the dataset doesn't have enough info, say so clearly
 """.strip()
 
-RECOMMENDATION_SYSTEM_PROMPT = """You are a Senior Business Intelligence Analyst and Strategic Advisor powered by LLaMA 3.3 70B.
+RECOMMENDATION_SYSTEM_PROMPT = """You are a Senior Business Intelligence Analyst and Strategic Advisor.
 
-The user has uploaded a dataset. Generate HIGH-LEVEL EXECUTIVE BUSINESS RECOMMENDATIONS.
+The user has uploaded a dataset. Generate HIGH-LEVEL EXECUTIVE BUSINESS RECOMMENDATIONS based on the actual data provided.
 
-ALWAYS respond in this exact structured format:
+ALWAYS respond in this exact structured format with REAL findings from the data:
 
 1. Key Findings:
-   - [Finding about sales/revenue/growth trends]
-   - [Finding about performance patterns]
-   - [Finding about data quality or completeness]
+   - Write an actual finding about trends or patterns found in the dataset columns
+   - Write an actual finding about performance patterns with real values
+   - Write an actual finding about data quality with specific numbers
 
 2. Business Problems Identified:
-   - [Specific issue with evidence from data]
-   - [Root cause analysis]
+   - Describe a specific issue found in the data with column names and values as evidence
+   - Provide root cause analysis based on the data correlations
 
 3. Strategic Recommendations:
-   - [Actionable step 1 with rationale]
-   - [Actionable step 2 with rationale]
-   - [Optimization or cost-saving strategy]
+   - Provide a concrete actionable recommendation with rationale from the data
+   - Provide a second actionable recommendation referencing specific columns
+   - Suggest an optimization or cost-saving strategy based on the data
 
 4. Growth Opportunities:
-   - [Market or segment opportunity]
-   - [Untapped potential area]
+   - Identify a market or segment opportunity visible in the data
+   - Identify untapped potential areas from the dataset patterns
 
 5. Risk Analysis:
-   - [Risk 1 with likelihood and impact]
-   - [Mitigation strategy]
+   - Describe a risk found in the data with its likelihood and impact
+   - Provide a concrete mitigation strategy
 
 6. Executive Summary:
-   [2-3 sentence high-level conclusion for C-suite decision makers]
+   Write 2-3 sentences summarizing the high-level conclusion for C-suite decision makers based on the actual dataset.
 
 Rules:
-- Be specific — reference actual column names and data values
+- NEVER use placeholder text in brackets like [example] — always write real content
+- Be specific — reference actual column names and data values from the dataset
 - Think like a McKinsey consultant
 - Base every recommendation on the actual dataset provided
 """.strip()
 
-AI_INSIGHTS_SYSTEM_PROMPT = """You are an AI-Powered Data Intelligence Engine running on LLaMA 3.3 70B.
+AI_INSIGHTS_SYSTEM_PROMPT = """You are an AI-Powered Data Intelligence Engine.
 
-The user has uploaded a dataset. Generate DEEP AI-LEVEL INSIGHTS — patterns, anomalies, predictions, and correlations.
+The user has uploaded a dataset. Generate DEEP AI-LEVEL INSIGHTS — patterns, anomalies, predictions, and correlations — using the actual data provided.
 
-ALWAYS respond in this exact structured format:
+ALWAYS respond in this exact structured format with REAL insights from the data:
 
 1. Pattern Recognition:
-   - [Hidden trend or seasonality detected]
-   - [Anomaly or outlier observation]
-   - [Distribution insight]
+   - Describe an actual hidden trend or seasonality you found in the data using real column names and values
+   - Describe an actual anomaly or outlier found in the dataset with specific numbers
+   - Describe an actual distribution insight with percentages or statistics
 
 2. Predictive Insights:
-   - [Near-term forecast based on observed trends]
-   - [Likely future outcome with confidence reasoning]
+   - Provide a near-term forecast based on the actual trends you observe in the data
+   - Describe a likely future outcome with confidence reasoning based on the patterns
 
 3. Customer / Segment Intelligence:
-   - [Behavioral cluster or cohort insight]
-   - [Retention or churn signal]
+   - Describe a behavioral cluster or cohort insight found in the categorical columns
+   - Identify a retention or churn signal visible in the data
 
 4. Performance Drivers:
-   - [Top driver of growth/decline with evidence]
-   - [Feature correlation finding]
+   - Identify the top driver of growth or decline with evidence from the actual data
+   - Describe a feature correlation finding with actual correlation values
 
 5. Advanced AI Observations:
-   - [Non-obvious cross-variable correlation]
-   - [Statistical anomaly worth investigating]
+   - Describe a non-obvious cross-variable correlation you found
+   - Identify a statistical anomaly worth investigating with actual numbers
 
 6. Smart AI Suggestions:
-   - [Data-backed decision recommendation]
-   - [Model or analytics action to take next]
+   - Provide a data-backed decision recommendation based on your analysis
+   - Suggest a model or analytics action to take next
 
 7. Insight Summary:
-   [High-level AI conclusion in 2-3 sentences]
+   Write 2-3 sentences with a high-level AI conclusion based on the actual dataset.
 
 Rules:
+- NEVER use placeholder text in brackets like [example] — always write real content based on the data
 - Think like a data scientist + ML engineer
 - Reference specific column names and actual values from the data
 - Identify non-obvious patterns from the provided dataset
 """.strip()
 
-DECISION_MAKING_SYSTEM_PROMPT = """You are an AI Decision Engine and Business Strategy Advisor powered by LLaMA 3.3 70B.
+DECISION_MAKING_SYSTEM_PROMPT = """You are an AI Decision Engine and Business Strategy Advisor.
 
 Your job is NOT just to analyze data — but to GIVE CLEAR DECISIONS on what should be DONE.
 
@@ -506,6 +527,416 @@ def _build_stats_context(session) -> str:
         return ""
 
 
+def _normalize_identifier(value: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
+
+
+def _summarize_columns(columns, limit: int = 20) -> str:
+    names = [str(column) for column in columns]
+    if len(names) <= limit:
+        return ", ".join(names)
+    return f"{', '.join(names[:limit])}, ... (+{len(names) - limit} more)"
+
+
+def _select_relevant_columns(df, prompt: str, *, limit: int) -> list[str]:
+    prompt_lower = str(prompt or "").lower()
+    prompt_normalized = _normalize_identifier(prompt)
+    prompt_tokens = set(re.findall(r"[a-z0-9]+", prompt_lower))
+    columns = [str(column) for column in df.columns]
+    scored: list[tuple[int, str]] = []
+
+    for column in columns:
+        normalized = _normalize_identifier(column)
+        tokens = re.findall(r"[a-z0-9]+", column.lower().replace("_", " ").replace("-", " "))
+        score = 0
+
+        if normalized and normalized in prompt_normalized:
+            score += 24
+
+        overlap = sum(1 for token in tokens if token in prompt_tokens)
+        if overlap:
+            score += overlap * 8
+            if overlap == len(set(tokens)):
+                score += 6
+
+        if score:
+            scored.append((score, column))
+
+    ordered = [column for _, column in sorted(scored, key=lambda item: (-item[0], item[1]))]
+    selected: list[str] = []
+    for column in ordered + columns:
+        if column in selected:
+            continue
+        selected.append(column)
+        if len(selected) >= min(limit, len(columns)):
+            break
+    return selected
+
+
+def _prepare_sample_frame(df):
+    sample = df.copy()
+    for column in sample.columns:
+        try:
+            sample[column] = sample[column].astype(str)
+        except Exception:
+            sample[column] = sample[column].map(lambda value: str(value))
+    return sample.fillna("N/A")
+
+
+def _csv_with_char_limit(df, max_chars: int) -> str:
+    if df.empty:
+        return ""
+
+    csv_lines = _prepare_sample_frame(df).to_csv(index=False).splitlines()
+    if not csv_lines:
+        return ""
+
+    output = [csv_lines[0]]
+    current_len = len(output[0]) + 1
+    included_rows = 0
+
+    for line in csv_lines[1:]:
+        next_len = len(line) + 1
+        if included_rows and current_len + next_len > max_chars:
+            break
+        output.append(line)
+        current_len += next_len
+        included_rows += 1
+
+    remaining_rows = max(0, len(csv_lines) - 1 - included_rows)
+    if remaining_rows:
+        output.append(f"... truncated {remaining_rows} more rows")
+
+    return "\n".join(output)
+
+
+def _analysis_sample_frame(df, max_rows: int = ANALYSIS_SAMPLE_ROWS):
+    if df is None or df.empty:
+        return df
+    return df.head(min(len(df), max_rows)).copy()
+
+
+def _session_columns(session) -> list[str]:
+    if session.df is not None and not session.df.empty:
+        return [str(column) for column in session.df.columns.tolist()]
+    if session.dataset_columns:
+        return [str(column) for column in session.dataset_columns]
+
+    snapshot = session.dataset_snapshot or {}
+    columns_info = snapshot.get("columns_info") or []
+    if columns_info:
+        columns = [str(item.get("column")) for item in columns_info if item.get("column")]
+        if columns:
+            return columns
+
+    for key in ("all_columns", "columns"):
+        raw_columns = snapshot.get(key) or []
+        if raw_columns:
+            return [str(column) for column in raw_columns]
+    return []
+
+
+def _match_question_columns(question: str, columns: list[str], limit: int = 4) -> list[str]:
+    prompt_lower = str(question or "").lower()
+    prompt_normalized = _normalize_identifier(question)
+    prompt_tokens = set(re.findall(r"[a-z0-9]+", prompt_lower))
+    scored: list[tuple[int, str]] = []
+
+    for column in columns:
+        normalized = _normalize_identifier(column)
+        tokens = re.findall(r"[a-z0-9]+", str(column).lower().replace("_", " ").replace("-", " "))
+        score = 0
+
+        if normalized and normalized in prompt_normalized:
+            score += 24
+
+        overlap = sum(1 for token in tokens if token in prompt_tokens)
+        if overlap:
+            score += overlap * 8
+            if overlap == len(set(tokens)):
+                score += 6
+
+        if score:
+            scored.append((score, str(column)))
+
+    return [column for _, column in sorted(scored, key=lambda item: (-item[0], item[1]))[:limit]]
+
+
+def _sanitize_answer_text(content: str) -> str:
+    lines = str(content or "").splitlines()
+    while lines and re.match(r'^\s*MODE\s*:\s*["\']?.+["\']?\s*$', lines[0].strip(), re.IGNORECASE):
+        lines.pop(0)
+    while lines and not lines[0].strip():
+        lines.pop(0)
+    return "\n".join(lines).strip()
+
+
+def _strict_chat_response(message: str, session) -> str | None:
+    lower = str(message or "").strip().lower()
+    if not lower:
+        return None
+
+    columns = _session_columns(session)
+    total_columns = len(columns) or int(session.dataset_column_count or 0)
+    total_rows = int(session.dataset_row_count or 0)
+    df = session.df if session.df is not None and not session.df.empty else None
+
+    if df is not None and total_rows <= 0:
+        total_rows = len(df)
+    if df is not None and total_columns <= 0:
+        total_columns = len(df.columns)
+
+    if re.search(r"\b(key columns|which columns|what columns|column names|fields|headers|schema)\b", lower):
+        if not columns:
+            return None
+        preview = columns[:12]
+        suffix = f", and {len(columns) - len(preview)} more" if len(columns) > len(preview) else ""
+        return (
+            f"This dataset has {total_columns:,} columns. "
+            f"The columns are: {', '.join(preview)}{suffix}."
+        )
+
+    if re.search(r"\b(how many columns|number of columns|total columns)\b", lower) and total_columns:
+        return f"The dataset has {total_columns:,} columns."
+
+    if re.search(r"\b(how many|count|number of|rows)\b", lower) and total_rows:
+        return f"The dataset contains {total_rows:,} rows."
+
+    if df is None:
+        return None
+
+    matched_columns = _match_question_columns(message, columns)
+    numeric_columns = [str(column) for column in df.select_dtypes(include=["number"]).columns.tolist()]
+    matched_numeric = next((column for column in matched_columns if column in numeric_columns), None)
+
+    if re.search(r"\b(average|mean|avg)\b", lower):
+        if re.search(r"\b(numeric columns|all numeric|all numbers)\b", lower) and numeric_columns:
+            summary = []
+            for column in numeric_columns[:5]:
+                series = df[column].dropna()
+                if series.empty:
+                    continue
+                summary.append(f"{column}: {series.mean():.2f}")
+            if summary:
+                return f"Average values for numeric columns: {', '.join(summary)}."
+        if matched_numeric:
+            series = df[matched_numeric].dropna()
+            if not series.empty:
+                return f"The average {matched_numeric} is {series.mean():.2f}."
+
+    if re.search(r"\b(highest|max|maximum|largest)\b", lower) and matched_numeric:
+        series = df[matched_numeric].dropna()
+        if not series.empty:
+            return f"The highest {matched_numeric} value is {series.max():.2f}."
+
+    if re.search(r"\b(lowest|min|minimum|smallest)\b", lower) and matched_numeric:
+        series = df[matched_numeric].dropna()
+        if not series.empty:
+            return f"The lowest {matched_numeric} value is {series.min():.2f}."
+
+    return None
+
+
+def _build_compact_csv_context(
+    session,
+    message: str,
+    *,
+    max_rows: int = CHAT_CONTEXT_MAX_ROWS,
+    max_columns: int = CHAT_CONTEXT_MAX_COLUMNS,
+    max_chars: int = CHAT_CONTEXT_MAX_CHARS,
+) -> str:
+    """Build a compact question-aware dataset snapshot for fast chat replies."""
+    try:
+        import numpy as np
+        from pandas.api.types import is_numeric_dtype
+
+        df = None
+        if session.df is not None and not session.df.empty:
+            df = session.df
+
+        if df is None or df.empty:
+            return ""
+
+        analysis_frame = _analysis_sample_frame(df)
+        total_rows = len(df)
+        total_cols = len(df.columns)
+        selected_columns = _select_relevant_columns(analysis_frame, message, limit=max_columns)
+        selected_frame = analysis_frame.loc[:, selected_columns].head(min(max_rows, len(analysis_frame))).copy()
+        numeric_cols = [
+            column for column in selected_columns
+            if column in analysis_frame.columns and is_numeric_dtype(analysis_frame[column])
+        ][:SUMMARY_NUMERIC_LIMIT]
+        categorical_cols = [
+            column for column in selected_columns if column not in numeric_cols
+        ][:SUMMARY_CATEGORICAL_LIMIT]
+
+        context_lines = [
+            f"Dataset: {session.dataset_name or 'Uploaded Dataset'}",
+            f"Rows: {total_rows:,} | Columns: {total_cols}",
+            f"Analysis sample used for speed: first {len(analysis_frame):,} rows",
+            f"Relevant columns for this question: {', '.join(selected_columns)}",
+            f"Column overview: {_summarize_columns(analysis_frame.columns)}",
+            "",
+        ]
+
+        missing_data = analysis_frame[selected_columns].isnull().sum()
+        if missing_data.sum() > 0:
+            context_lines.append("Missing values in relevant columns:")
+            for column, missing_count in missing_data[missing_data > 0].head(6).items():
+                missing_pct = (missing_count / max(1, len(analysis_frame))) * 100
+                context_lines.append(f"  {column}: {missing_count:,} ({missing_pct:.1f}%)")
+            context_lines.append("")
+
+        if numeric_cols:
+            context_lines.append("Relevant numeric summary:")
+            for column in numeric_cols:
+                series = analysis_frame[column].dropna()
+                if series.empty:
+                    continue
+                context_lines.append(
+                    f"  {column}: mean={series.mean():.3f}, median={series.median():.3f}, "
+                    f"min={series.min():.3f}, max={series.max():.3f}"
+                )
+            context_lines.append("")
+
+        if categorical_cols:
+            context_lines.append("Relevant categorical summary:")
+            for column in categorical_cols:
+                counts = analysis_frame[column].astype(str).value_counts(dropna=False).head(3)
+                breakdown = ", ".join(f"{value} ({count:,})" for value, count in counts.items())
+                context_lines.append(f"  {column}: {breakdown}")
+            context_lines.append("")
+
+        if len(numeric_cols) >= 2:
+            context_lines.append("Top correlations from relevant numeric columns:")
+            corr_matrix = analysis_frame[numeric_cols].corr()
+            pairs = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i + 1, len(corr_matrix.columns)):
+                    corr_val = corr_matrix.iloc[i, j]
+                    if np.isnan(corr_val):
+                        continue
+                    pairs.append((abs(corr_val), corr_matrix.columns[i], corr_matrix.columns[j], corr_val))
+            for _, col1, col2, corr_val in sorted(pairs, reverse=True)[:SUMMARY_CORRELATION_LIMIT]:
+                context_lines.append(f"  {col1} - {col2}: {corr_val:.3f}")
+            context_lines.append("")
+
+        context_lines.append(
+            f"Sample rows for relevant columns (up to {min(max_rows, total_rows)} rows, CSV):"
+        )
+        context_lines.append(_csv_with_char_limit(selected_frame, max_chars))
+        return "\n".join(context_lines)
+
+    except Exception as exc:
+        log.warning("_build_compact_csv_context: failed: %s", exc)
+        return ""
+
+
+def _build_compact_stats_context(
+    session,
+    message: str,
+    *,
+    max_rows: int = INSIGHT_CONTEXT_MAX_ROWS,
+    max_columns: int = INSIGHT_CONTEXT_MAX_COLUMNS,
+    max_chars: int = INSIGHT_CONTEXT_MAX_CHARS,
+) -> str:
+    """Build a concise dataset summary for insight and recommendation modes."""
+    try:
+        import pandas as pd
+        import numpy as np
+
+        df = session.df
+        if df is None or df.empty:
+            return ""
+
+        analysis_frame = _analysis_sample_frame(df)
+        total_rows = len(df)
+        total_cols = len(df.columns)
+        selected_columns = _select_relevant_columns(analysis_frame, message, limit=max_columns)
+        selected_frame = analysis_frame.loc[:, selected_columns].head(min(max_rows, len(analysis_frame))).copy()
+        numeric_cols = analysis_frame.select_dtypes(include=[np.number]).columns.tolist()
+        focus_numeric_cols = [
+            column for column in selected_columns if column in numeric_cols
+        ] or numeric_cols[:SUMMARY_NUMERIC_LIMIT]
+        focus_numeric_cols = focus_numeric_cols[:SUMMARY_NUMERIC_LIMIT]
+        focus_categorical_cols = [
+            column for column in selected_columns if column not in focus_numeric_cols
+        ][:SUMMARY_CATEGORICAL_LIMIT]
+        datetime_cols = analysis_frame.select_dtypes(include=["datetime64[ns]", "datetime64"]).columns.tolist()[:2]
+
+        missing_data = analysis_frame.isnull().sum()
+        total_missing = int(missing_data.sum())
+        missing_pct = (total_missing / max(1, len(analysis_frame) * total_cols)) * 100
+        duplicate_rows = int(analysis_frame.duplicated().sum())
+
+        lines = [
+            f"Dataset: {session.dataset_name or 'Dataset'}",
+            f"Dimensions: {total_rows:,} rows x {total_cols} columns",
+            f"Analysis sample used for speed: first {len(analysis_frame):,} rows",
+            f"Column overview: {_summarize_columns(analysis_frame.columns)}",
+            f"Missing cells: {total_missing:,} ({missing_pct:.2f}%) | Duplicate rows: {duplicate_rows:,}",
+            f"Highlighted columns for this request: {', '.join(selected_columns)}",
+            "",
+        ]
+
+        if focus_numeric_cols:
+            lines.append("Numeric highlights:")
+            for column in focus_numeric_cols:
+                series = analysis_frame[column].dropna()
+                if series.empty:
+                    continue
+                q1 = series.quantile(0.25)
+                q3 = series.quantile(0.75)
+                iqr = q3 - q1
+                outliers = series[(series < (q1 - 1.5 * iqr)) | (series > (q3 + 1.5 * iqr))]
+                lines.append(
+                    f"  {column}: mean={series.mean():.3f}, median={series.median():.3f}, "
+                    f"p25={q1:.3f}, p75={q3:.3f}, outliers={len(outliers):,}"
+                )
+            lines.append("")
+
+        if focus_categorical_cols:
+            lines.append("Categorical highlights:")
+            for column in focus_categorical_cols:
+                counts = analysis_frame[column].astype(str).value_counts(dropna=False).head(3)
+                breakdown = ", ".join(f"{value} ({count:,})" for value, count in counts.items())
+                lines.append(f"  {column}: {breakdown}")
+            lines.append("")
+
+        if len(focus_numeric_cols) >= 2:
+            lines.append("Top correlations:")
+            corr_matrix = analysis_frame[focus_numeric_cols].corr()
+            pairs = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i + 1, len(corr_matrix.columns)):
+                    corr_val = corr_matrix.iloc[i, j]
+                    if np.isnan(corr_val):
+                        continue
+                    pairs.append((abs(corr_val), corr_matrix.columns[i], corr_matrix.columns[j], corr_val))
+            for _, col1, col2, corr_val in sorted(pairs, reverse=True)[:SUMMARY_CORRELATION_LIMIT]:
+                lines.append(f"  {col1} - {col2}: {corr_val:.3f}")
+            lines.append("")
+
+        if datetime_cols:
+            lines.append("Date coverage:")
+            for column in datetime_cols:
+                dates = pd.to_datetime(analysis_frame[column], errors="coerce").dropna()
+                if dates.empty:
+                    continue
+                lines.append(f"  {column}: {dates.min()} to {dates.max()}")
+            lines.append("")
+
+        lines.append(
+            f"Sample rows for highlighted columns (up to {min(max_rows, total_rows)} rows, CSV):"
+        )
+        lines.append(_csv_with_char_limit(selected_frame, max_chars))
+        return "\n".join(lines)
+
+    except Exception as exc:
+        log.warning("_build_compact_stats_context: failed: %s", exc)
+        return ""
+
+
 def _ensure_dataset_in_session(session, session_id: str, document) -> bool:
     """Ensure session has live DataFrame."""
     if has_live_dataset(session):
@@ -529,14 +960,38 @@ async def _call_groq_with_dataset(
     This matches exactly what the original standalone chatbot did.
     """
     session = store.get(session_id)
+    llm_meta = get_active_llm_summary()
     document = await get_dataset(session_id)
     _ensure_dataset_in_session(session, session_id, document)
+    dataset_signature = (
+        session.dataset_name or "",
+        session.dataset_row_count,
+        session.dataset_column_count,
+    )
+    cache_key = (CHAT_CACHE_VERSION, mode, message.strip().lower(), dataset_signature)
+    cached_response = session.chat_cache.get(cache_key)
+    if cached_response:
+        return cached_response
 
-    # Build context: CSV for chat, full stats for insights/recommendations
     if mode == "chat":
-        dataset_context = _build_csv_context(session, max_rows=1000)  # Increased to 1000 rows for better analysis
+        strict_answer = _strict_chat_response(message, session)
+        if strict_answer:
+            payload = {
+                "answer": strict_answer,
+                "mode": mode,
+                "source": "strict_local",
+                "provider": "local",
+                "model": "local_dataset_rules",
+                "dataset_available": bool(_session_columns(session)),
+            }
+            session.chat_cache[cache_key] = payload
+            return payload
+
+    # Build compact context so Groq receives a much smaller prompt.
+    if mode == "chat":
+        dataset_context = _build_compact_csv_context(session, message)
     else:
-        dataset_context = _build_stats_context(session)
+        dataset_context = _build_compact_stats_context(session, message)
 
     has_data = bool(dataset_context)
 
@@ -546,7 +1001,8 @@ async def _call_groq_with_dataset(
             f"DATASET INFORMATION:\n{dataset_context}\n\n"
             f"USER QUESTION:\n{message}\n\n"
             f"Answer based strictly on the dataset above. "
-            f"Use the actual column names and values."
+            f"Use the actual column names and values. "
+            f"Keep the reply concise unless the user explicitly asks for detail."
         )
     else:
         user_content = (
@@ -563,10 +1019,16 @@ async def _call_groq_with_dataset(
 
     # Token budget
     max_tokens_map = {
-        "recommendation_insights": 2000,
-        "ai_insights": 1800,
-        "decision_making": 2500,
+        "recommendation_insights": 4000,
+        "ai_insights": 4000,
+        "decision_making": 3000,
         "chat": 800,
+    }
+    retry_map = {
+        "recommendation_insights": 1,
+        "ai_insights": 1,
+        "decision_making": 1,
+        "chat": 0,
     }
     temperature_map = {
         "recommendation_insights": 0.3,
@@ -584,9 +1046,10 @@ async def _call_groq_with_dataset(
                 session=session,
             )
             return {
-                "answer": result.get("content", _mode_fallback_message(mode)),
+                "answer": _sanitize_answer_text(result.get("content", _mode_fallback_message(mode))),
                 "mode": mode,
                 "source": "local_fallback",
+                "provider": "local",
                 "dataset_available": has_data,
             }
         except Exception as exc:
@@ -595,6 +1058,7 @@ async def _call_groq_with_dataset(
                 "answer": _mode_fallback_message(mode),
                 "mode": mode,
                 "source": "error",
+                "provider": "local",
                 "dataset_available": False,
             }
 
@@ -603,14 +1067,21 @@ async def _call_groq_with_dataset(
             groq_messages,
             max_tokens=max_tokens_map.get(mode, 1000),
             temperature=temperature_map.get(mode, 0.2),
+            retries=retry_map.get(mode, 1),
         )
-        return {
-            "answer": content or _mode_fallback_message(mode),
+        payload = {
+            "answer": _sanitize_answer_text(content or _mode_fallback_message(mode)),
             "mode": mode,
-            "source": "groq",
-            "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+            "source": str(llm_meta.get("provider") or "llm"),
+            "provider": str(llm_meta.get("provider") or "llm"),
+            "model": str(llm_meta.get("model") or ""),
             "dataset_available": has_data,
         }
+        session.chat_cache[cache_key] = payload
+        if len(session.chat_cache) > 100:
+            oldest_key = next(iter(session.chat_cache))
+            session.chat_cache.pop(oldest_key, None)
+        return payload
     except Exception as exc:
         log.error("_call_groq_with_dataset: Groq failed for mode=%s: %s", mode, exc)
         # Fallback to local
@@ -624,6 +1095,7 @@ async def _call_groq_with_dataset(
                 "answer": result.get("content", _mode_fallback_message(mode)),
                 "mode": mode,
                 "source": "local_fallback",
+                "provider": "local",
                 "dataset_available": has_data,
                 "error": "AI model temporarily unavailable. Showing local analysis.",
             }
@@ -632,6 +1104,7 @@ async def _call_groq_with_dataset(
                 "answer": _mode_fallback_message(mode),
                 "mode": mode,
                 "source": "error",
+                "provider": "local",
                 "dataset_available": False,
                 "error": "AI service temporarily unavailable. Please retry.",
             }
@@ -773,6 +1246,7 @@ async def clear_chat(
 
 @router.get("/chat/modes")
 async def get_supported_modes():
+    llm_meta = get_active_llm_summary()
     return JSONResponse({
         "modes": [
             {"id": "chat", "label": "Chat", "description": "Dataset Q&A and AI assistant", "icon": "💬"},
@@ -781,7 +1255,9 @@ async def get_supported_modes():
             {"id": "decision_making", "label": "Decision Making", "description": "Clear business decisions and actions", "icon": "🎯"},
         ],
         "default_mode": "chat",
-        "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
+        "provider": llm_meta.get("provider"),
+        "model": llm_meta.get("model"),
+        "configured": llm_meta.get("configured"),
         "groq_configured": has_groq_config(),
     })
 
@@ -939,9 +1415,12 @@ def _generate_health_recommendations(health_metrics, issues, warnings):
 
 @router.get("/chat/health")
 async def chat_health():
+    llm_meta = get_active_llm_summary()
     return JSONResponse({
         "status": "ok",
+        "provider": llm_meta.get("provider"),
+        "model": llm_meta.get("model"),
+        "configured": llm_meta.get("configured"),
         "groq_configured": has_groq_config(),
-        "model": os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"),
         "modes_available": sorted(ALLOWED_MODES),
     })

@@ -7,6 +7,7 @@ export default function GlassModal({
   onClose,
   children,
   footer = null,
+  panelClass = '',
 }) {
   useEffect(() => {
     if (!open) return undefined
@@ -23,7 +24,7 @@ export default function GlassModal({
 
   return (
     <div className="ds-modal-backdrop" role="dialog" aria-modal="true" aria-label={title || 'Dialog'}>
-      <div className="ds-modal-panel">
+      <div className={`ds-modal-panel ${panelClass}`}>
         <header className="ds-modal-head">
           <h3>{title}</h3>
           <button

@@ -190,7 +190,10 @@ export default function AuthModal({
         return
       }
 
-      push(`Welcome back, ${response.profile.fullName} 👋`, 'success')
+      push(`Welcome back, ${response.profile.fullName.split(' ')[0]}! 👋`, 'success')
+      localStorage.setItem('datalytics_welcome_type', 'back')
+      localStorage.setItem('datalytics_welcome_shown', 'false')
+      window.dispatchEvent(new CustomEvent('datalytics:login-success'))
       window.setTimeout(() => {
         onAuthenticated?.(response.profile)
       }, 600)
@@ -222,10 +225,13 @@ export default function AuthModal({
       const response = await loginWithGoogle(view === 'signup' ? signupForm.role : loginRole)
       push(
         response.isNewUser
-          ? `Welcome, ${response.profile.fullName} 🎉 Your account is ready!`
-          : `Welcome back, ${response.profile.fullName} 👋`,
+          ? `Welcome, ${response.profile.fullName.split(' ')[0]}! 🎉 Your account is ready!`
+          : `Welcome back, ${response.profile.fullName.split(' ')[0]}! 👋`,
         'success'
       )
+      localStorage.setItem('datalytics_welcome_type', response.isNewUser ? 'new' : 'back')
+      localStorage.setItem('datalytics_welcome_shown', 'false')
+      window.dispatchEvent(new CustomEvent('datalytics:login-success'))
       window.setTimeout(() => {
         onAuthenticated?.(response.profile)
       }, 600)
@@ -256,7 +262,10 @@ export default function AuthModal({
   async function handleVerifyOtp(code) {
     try {
       const response = await verifyOtp(code)
-      push(`Welcome, ${response.profile.fullName} 🎉 Your account is ready!`, 'success')
+      push(`Welcome, ${response.profile.fullName.split(' ')[0]}! 🎉 Your account is ready!`, 'success')
+      localStorage.setItem('datalytics_welcome_type', 'new')
+      localStorage.setItem('datalytics_welcome_shown', 'false')
+      window.dispatchEvent(new CustomEvent('datalytics:login-success'))
       window.setTimeout(() => {
         onAuthenticated?.(response.profile)
       }, 650)

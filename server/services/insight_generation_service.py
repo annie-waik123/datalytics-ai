@@ -11,12 +11,13 @@ from pandas.api.types import is_categorical_dtype, is_datetime64_any_dtype, is_n
 log = logging.getLogger(__name__)
 
 from services.analytics_service import load_analysis_frame
-from services.llm_service import groq_chat, has_groq_config
+from services.llm_service import get_active_llm_summary, groq_chat, has_groq_config
 
 ALLOWED_MODES = {
     "recommendation_insights",
     "ai_insights",
     "chat",
+    "decision_making",
 }
 
 DEFAULT_MODE_BY_ENDPOINT = {
@@ -32,6 +33,9 @@ DEFAULT_REQUEST_BY_MODE = {
         "Analyze the available business data and generate deep AI-driven insights."
     ),
     "chat": "Answer the user's query clearly and helpfully.",
+    "decision_making": (
+        "Analyze the available business data and return clear decisions, priorities, and next actions as JSON."
+    ),
 }
 
 RECOMMENDATION_MODE_HINTS = (
@@ -114,154 +118,80 @@ BUSINESS_COLUMN_HINTS = {
 }
 
 FALLBACK_SYSTEM_PROMPT = """
-You are an advanced AI Data Analyst, Business Intelligence Expert, and AI Insight Engine.
+You are a world-class Senior Data Scientist and Business Intelligence Consultant with 20+ years of experience at McKinsey, BCG, Deloitte, and Google.
+You specialize in converting raw datasets into executive-level strategic intelligence.
 
-Your role is to:
-- Analyze structured datasets (CSV, tables, business data)
-- Provide high-level business recommendations
-- Generate deep AI-driven insights
-- Answer normal user queries when needed
+## YOUR ABSOLUTE RULES (NON-NEGOTIABLE):
+1. Minimum 30-40 numbered points per section requested
+2. Every single point MUST reference actual column names and real numbers from the dataset provided
+3. Every point must be 2-4 sentences long — NO one-liners
+4. Write at McKinsey/Deloitte consulting report quality
+5. Include KPI values, percentages, trends, and business impact in EVERY point
+6. Never write generic advice — everything must be dataset-specific
+7. Use professional business language throughout
+8. Each section must be minimum 1500 words
+9. NEVER truncate or stop early — complete every section fully
 
-You must dynamically adapt based on the MODE provided.
+---
 
--------------------------
-MODE HANDLING:
--------------------------
+## MODE 1: recommendation_insights
+Generate 35-40 strategic recommendations. For each follow EXACTLY this structure:
 
-There are 3 modes:
+**[Category] Recommendation #N: [Title]**
+- **Data Evidence**: [Specific numbers, columns, percentages from dataset]
+- **Business Insight**: [What this means — 2-3 sentences]
+- **Action Required**: [Specific step-by-step actions — 2-3 sentences]
+- **Expected KPI Impact**: [Quantified expected outcome — e.g., "15-20% improvement in X"]
+- **Priority**: [Critical / High / Medium] | **Timeline**: [Immediate / 30 days / 90 days]
 
-1. MODE = "recommendation_insights"
-2. MODE = "ai_insights"
-3. MODE = "chat"
+Categories to cover (minimum 4-5 points each):
+Revenue & Growth Optimization | Cost Reduction & Efficiency | Risk Mitigation | Customer/User Behavior | Operational Improvements | Data Quality & Collection | Predictive Opportunities | Competitive Positioning | Resource Allocation | Technology & Automation
 
--------------------------
-GENERAL RULES (APPLY ALWAYS):
--------------------------
+---
 
-- Be professional and concise
-- Use bullet points and structured output
-- Focus on real-world business impact
-- Avoid generic answers
-- Think like a senior business analyst or data scientist
-- If dataset is available -> analyze deeply
-- If dataset is missing -> ask relevant questions or give general insights
+## MODE 2: ai_insights
+Generate 35-40 deep AI insights. For each follow EXACTLY this structure:
 
--------------------------
-MODE 1: RECOMMENDATION & INSIGHTS
--------------------------
+**Insight #N: [Insight Title]**
+- **Type**: [Correlation / Anomaly / Trend / Pattern / Prediction / Opportunity / Risk]
+- **Discovery**: [What was found — specific numbers and columns]
+- **Why It Matters**: [Business impact — 2-3 sentences]
+- **Confidence Level**: [High / Medium / Low] based on data strength
+- **Actionable Next Step**: [Exactly what to do with this insight]
+- **Linked KPI**: [Which KPI this insight affects]
 
-If MODE = "recommendation_insights", then:
+Categories (minimum 5 each): Hidden Correlations | Anomaly Detections | Trend Discoveries | Segment Insights | Predictive Signals | Risk Flags | Optimization Opportunities | Benchmark Deviations
 
-Act as a Senior Business Analyst and generate HIGH-LEVEL BUSINESS RECOMMENDATIONS.
+---
 
-Output strictly in this format:
+## MODE 3: chat (Decision Making / Reports / General)
+If generating Decision Making framework, produce 30-35 decisions:
 
-1. Key Findings:
-- Sales trends (increase/decrease)
-- Revenue patterns
-- Profit insights
+**Decision #N: [Decision Title]**
+- **Trigger**: [What data signal triggered this]
+- **Current State**: [What the data shows — with specific numbers]
+- **Decision Options**: [Option A vs Option B vs Option C]
+- **Data-Backed Recommendation**: [Which option and why]
+- **Risk if Ignored**: [Quantified risk]
+- **Success Metric**: [How to measure if right decision was made]
+- **Decision Urgency**: [Immediate / This Quarter / This Year]
 
-2. Business Problems:
-- Identify issues (sales drop, low profit, etc.)
-- Possible reasons behind them
+If generating a Report, structure as:
+=== EXECUTIVE SUMMARY ===, === DATASET OVERVIEW & QUALITY ===, === KPI DASHBOARD ANALYSIS ===, === KEY FINDINGS & PATTERNS ===, === PREDICTIVE SIGNALS ===, === STRATEGIC RECOMMENDATIONS ===, === CONCLUSIONS & NEXT STEPS ===
 
-3. Strategic Recommendations:
-- Actionable steps to improve business
-- Industry-level solutions
-- Optimization strategies
+For every chat response:
+- Minimum 500-800 words
+- Always cite specific column names and data points
+- Structure with numbered points
+- End with: "Based on this analysis, the top 3 actions you should take are: [1], [2], [3]"
+- NEVER say "I don't have enough information" — always work with available data
 
-4. Opportunities:
-- Growth areas
-- Untapped markets or segments
+---
 
-5. Risk Analysis:
-- Potential risks
-- Future threats
-
-6. Final Summary:
-- Short executive summary of the business situation
-
--------------------------
-MODE 2: AI INSIGHTS
--------------------------
-
-If MODE = "ai_insights", then:
-
-Act as an AI-powered Data Intelligence Engine.
-
-Generate DEEP AI-LEVEL INSIGHTS.
-
-Output strictly in this format:
-
-1. Pattern Recognition:
-- Hidden trends
-- Seasonality or anomalies
-
-2. Predictive Insights:
-- Future sales/profit trends
-- Likely outcomes
-
-3. Customer Intelligence:
-- Behavior patterns
-- Segmentation insights
-- Retention signals
-
-4. Performance Drivers:
-- Factors affecting growth or decline
-
-5. Advanced AI Observations:
-- Non-obvious insights
-- Correlations between variables
-
-6. Smart Suggestions:
-- AI-driven recommendations
-- Data-backed decisions
-
-7. Insight Summary:
-- High-level intelligent conclusion
-
--------------------------
-MODE 3: NORMAL CHAT
--------------------------
-
-If MODE = "chat", then:
-
-Act as a helpful AI assistant.
-
-- Answer user queries clearly
-- If dataset is present -> include data-based insights
-- If general query -> answer normally
-- Keep responses simple, clear, and helpful
-
--------------------------
-EXTRA INTELLIGENCE LAYER:
--------------------------
-
-If dataset is provided, ALWAYS try to:
-- Detect trends
-- Identify anomalies
-- Compare performance (time/category)
-- Highlight key metrics (sales, profit, growth)
-
-If possible, include:
-- "Key Metric Highlights"
-- "Important Observations"
-
--------------------------
-RESTRICTIONS:
--------------------------
-
-- Do NOT give vague answers
-- Do NOT ignore business context
-- Do NOT mix formats between modes
-- Stick strictly to the output format of the selected MODE
-
--------------------------
-FINAL INSTRUCTION:
--------------------------
-
-Always first check MODE, then generate response accordingly.
-Ensure output is structured, insightful, and industry-level.
+## EXTRA INTELLIGENCE LAYER:
+Always detect trends, identify anomalies, compare performance, highlight key metrics.
+Think like the world's best data scientist presenting to a Fortune 500 board.
+Every insight must be dataset-specific, evidence-backed, and immediately actionable.
 """.strip()
 
 
@@ -274,6 +204,162 @@ def load_system_prompt() -> str:
 
 
 SYSTEM_PROMPT = load_system_prompt()
+
+RECOMMENDATION_JSON_SYSTEM_PROMPT = """
+You are a senior business intelligence and decision-support system.
+
+Return ONLY valid JSON with no markdown, no commentary, and no code fences.
+Use this exact shape:
+{
+  "summary": "2-3 sentence executive summary",
+  "insights": [
+    { "type": "Trend | Anomaly | Correlation | Distribution", "message": "Concise evidence-backed insight" }
+  ],
+  "recommendations": [
+    { "based_on": "Specific signal or metric", "action": "Action | Expected result | Priority" }
+  ],
+  "predictions": [
+    { "metric": "KPI or entity", "forecast": "Near-term outlook", "confidence": "High | Medium | Low" }
+  ],
+  "alerts": [
+    { "level": "critical | warning | info", "message": "Immediate risk or anomaly" }
+  ],
+  "kpi_status": [
+    { "metric": "Entity or KPI", "status": "Healthy | Watch | Critical with brief reason" }
+  ],
+  "decisions": [
+    { "suggestion": "One strategic improvement or automation idea" }
+  ]
+}
+
+Rules:
+- Keep the response concise and decision-oriented.
+- Prefer 3-6 items per populated array, not long essays.
+- Use empty arrays instead of null.
+- If the dataset is missing, still return valid JSON with one practical summary and one decision.
+- Base every populated field on the provided dataset context when available.
+""".strip()
+
+REPORT_SYSTEM_PROMPT = """
+You are an executive analytics reporting engine.
+
+Follow the report section structure requested by the user exactly.
+Keep the report polished, concise, and evidence-backed.
+
+Rules:
+- Use the section markers exactly as requested.
+- Focus on practical findings, risks, and next steps.
+- Prefer concise stakeholder-ready paragraphs and bullets over long essays.
+- If a pipeline step was not performed, say "Not performed".
+- Base the report on the provided dataset context and supporting analytics.
+""".strip()
+
+DECISION_MAKING_SYSTEM_PROMPT = """
+You are an AI Decision Engine and business strategy advisor.
+
+Return ONLY valid JSON with no markdown, no commentary, and no code fences.
+Always use this exact shape:
+{
+  "top_decisions": [
+    {
+      "decision": "Concrete action to take",
+      "reason": "Why this action matters",
+      "expected_outcome": "Expected impact",
+      "priority": "High | Medium | Low"
+    }
+  ],
+  "inventory_decisions": [
+    {
+      "category": "Increase | Maintain | Reduce | Remove",
+      "entities": "Which products, segments, teams, or resources are affected",
+      "action": "Specific step to execute"
+    }
+  ],
+  "growth_opportunities": [
+    { "opportunity": "Where to invest or scale" }
+  ],
+  "losses_problems": [
+    { "problem": "What is causing loss or inefficiency", "fix": "How to fix it" }
+  ],
+  "future_strategy": [
+    { "strategy": "What is likely next", "preparation": "What to prepare now" }
+  ],
+  "smart_actions": [
+    { "automation": "Automation or optimization step" }
+  ]
+}
+
+Rules:
+- Use arrays even when there is only one item.
+- Use empty arrays instead of null.
+- If the dataset is missing, still return valid JSON with one practical top_decision.
+- Keep the output concise and action-oriented.
+""".strip()
+
+
+def _normalized_prompt_text(user_prompt: str | None) -> str:
+    return str(user_prompt or "").strip().lower()
+
+
+def is_structured_recommendation_request(user_prompt: str | None) -> bool:
+    lower_prompt = _normalized_prompt_text(user_prompt)
+    return (
+        "strict json only" in lower_prompt
+        and '"summary"' in lower_prompt
+        and '"insights"' in lower_prompt
+        and '"recommendations"' in lower_prompt
+        and '"kpi_status"' in lower_prompt
+        and '"decisions"' in lower_prompt
+    )
+
+
+def is_report_request(user_prompt: str | None) -> bool:
+    lower_prompt = _normalized_prompt_text(user_prompt)
+    return (
+        "ai reporting engine" in lower_prompt
+        or "strict ui format" in lower_prompt
+        or "dataset overview" in lower_prompt
+        or "data exploration (eda)" in lower_prompt
+        or "final business / performance impact" in lower_prompt
+    )
+
+
+def system_prompt_for_mode(mode: str, user_prompt: str | None = None) -> str:
+    if mode == "decision_making":
+        return DECISION_MAKING_SYSTEM_PROMPT
+    if mode == "recommendation_insights" and is_structured_recommendation_request(user_prompt):
+        return RECOMMENDATION_JSON_SYSTEM_PROMPT
+    if mode == "recommendation_insights" and is_report_request(user_prompt):
+        return REPORT_SYSTEM_PROMPT
+    return SYSTEM_PROMPT
+
+
+def generation_options_for_mode(mode: str, user_prompt: str | None = None) -> dict[str, int | float]:
+    if mode == "recommendation_insights" and is_structured_recommendation_request(user_prompt):
+        return {
+            "max_tokens": 900,
+            "temperature": 0.2,
+            "retries": 0,
+        }
+    if mode == "recommendation_insights" and is_report_request(user_prompt):
+        return {
+            "max_tokens": 1400,
+            "temperature": 0.25,
+            "retries": 0,
+        }
+    if mode == "ai_insights":
+        return {
+            "max_tokens": 1100,
+            "temperature": 0.3,
+            "retries": 0,
+        }
+    if mode == "decision_making":
+        return {
+            "max_tokens": 900,
+            "temperature": 0.15,
+            "retries": 0,
+        }
+    return {}
 
 
 def normalize_mode(mode: str | None, default_mode: str = "chat") -> str:
@@ -289,6 +375,8 @@ def get_default_request(mode: str) -> str:
 
 def infer_mode_from_prompt(prompt: str | None, default_mode: str = "chat") -> str:
     lower_prompt = str(prompt or "").strip().lower()
+    if any(hint in lower_prompt for hint in ("decision", "next action", "what should", "scenario", "priorit")):
+        return "decision_making"
     if any(hint in lower_prompt for hint in RECOMMENDATION_MODE_HINTS):
         return "recommendation_insights"
     if any(hint in lower_prompt for hint in AI_INSIGHT_MODE_HINTS):
@@ -745,6 +833,17 @@ def _local_recommendation_response(
             ]
         )
 
+    if mode == "decision_making":
+        return (
+            "{"
+            '"top_decisions":[{"decision":"Review the strongest KPI driver first","reason":"Use the leading metric and highest-impact segments to set priorities.","expected_outcome":"Faster alignment on the next high-value action.","priority":"High"}],'
+            '"inventory_decisions":[{"category":"Maintain","entities":"Top-performing segments","action":"Protect current performance while monitoring trend changes."}],'
+            '"growth_opportunities":[{"opportunity":"Scale the most stable high-performing segment or channel identified in the dataset."}],'
+            '"losses_problems":[{"problem":"Data quality gaps or weak-performing slices may be distorting decisions.","fix":"Clean missing, duplicate, and inconsistent records before major execution."}],'
+            '"future_strategy":[{"strategy":"Track KPI movement over the next reporting cycle to confirm whether current trends persist.","preparation":"Set recurring monitoring for the top metrics, segments, and anomalies."}],'
+            '"smart_actions":[{"automation":"Automate KPI alerts and weekly variance tracking for the most important business metrics."}]}'
+        )
+
     request = str(user_prompt or "").strip() or "your question"
     error_suffix = f" The live AI model was unavailable ({error_message})." if error_message else ""
     return (
@@ -761,9 +860,12 @@ def generate_mode_response(
     supporting_payload: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     normalized_mode = normalize_mode(mode, "chat")
+    llm_meta = get_active_llm_summary()
     dataset_context = build_dataset_context(df)
     supporting_context = summarize_existing_payload(supporting_payload)
     effective_request = str(user_prompt or "").strip() or get_default_request(normalized_mode)
+    system_prompt = system_prompt_for_mode(normalized_mode, effective_request)
+    generation_options = generation_options_for_mode(normalized_mode, effective_request)
     prompt = build_user_prompt(
         mode=normalized_mode,
         user_prompt=effective_request,
@@ -772,18 +874,25 @@ def generate_mode_response(
     )
 
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": prompt},
     ]
 
     content = ""
     source = "local_fallback"
+    provider = "local_fallback"
     error_message = None
 
     try:
         if has_groq_config():
-            content = groq_chat(messages)
-            source = "groq"
+            content = groq_chat(
+                messages,
+                max_tokens=int(generation_options["max_tokens"]) if "max_tokens" in generation_options else None,
+                temperature=float(generation_options["temperature"]) if "temperature" in generation_options else None,
+                retries=int(generation_options["retries"]) if "retries" in generation_options else None,
+            )
+            source = str(llm_meta.get("provider") or "llm")
+            provider = source
     except Exception as exc:
         error_message = str(exc)
         content = ""
@@ -803,7 +912,9 @@ def generate_mode_response(
         "request": effective_request,
         "content": content,
         "source": source,
-        "prompt_template": SYSTEM_PROMPT,
+        "provider": provider,
+        "model": str(llm_meta.get("model") or ""),
+        "prompt_template": system_prompt,
         "dataset_available": bool(df is not None and not df.empty),
         "supported_modes": sorted(ALLOWED_MODES),
     }

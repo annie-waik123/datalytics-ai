@@ -20,7 +20,7 @@ export function useDataset() {
     const meta = safeParse(localStorage.getItem(STORAGE_META_KEY));
     if (stored?.rows?.length) {
       setDataset({ ...stored, meta });
-      window.datasetJSON = stored.rows.slice(0, 500);
+      window.datasetJSON = stored.rows.slice(0, 1000);
     }
   }, []);
 
@@ -37,7 +37,7 @@ export function useDataset() {
     const shouldStoreSampleOnly = Boolean(nextDataset?.meta?.backend_managed) || String(nextDataset?.meta?.storage_mode || '').toLowerCase() === 'disk';
     const payload = {
       name: nextDataset.name,
-      rows: shouldStoreSampleOnly ? sampleRows.slice(0, 500) : sampleRows,
+      rows: shouldStoreSampleOnly ? sampleRows.slice(0, 1000) : sampleRows,
       columns: nextDataset.columns,
     };
     const json = JSON.stringify(payload);
@@ -47,13 +47,13 @@ export function useDataset() {
     } else {
       const sample = {
         name: nextDataset.name,
-        rows: nextDataset.rows.slice(0, 500),
+        rows: nextDataset.rows.slice(0, 1000),
         columns: nextDataset.columns,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sample));
       localStorage.setItem(STORAGE_META_KEY, JSON.stringify({ ...nextDataset.meta, truncated: true }));
     }
-    window.datasetJSON = sampleRows.slice(0, 500);
+    window.datasetJSON = sampleRows.slice(0, 1000);
   }
 
   function updateDataset(nextDataset) {

@@ -6,6 +6,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from datetime import datetime
 import jwt
+from dotenv import load_dotenv
+
+# Ensure .env is loaded even when this module is imported stand-alone
+load_dotenv(override=True)
 
 try:
     import razorpay
@@ -16,6 +20,39 @@ except ImportError:
 from database import get_db
 
 router = APIRouter()
+
+PLAN_CATALOG = {
+    "Platinum": {"price": 199, "diamonds": 199},
+    "Elite": {"price": 399, "diamonds": 399},
+    "Ultra": {"price": 699, "diamonds": 699},
+    "Max": {"price": 999, "diamonds": 999},
+    "Prime": {"price": 1499, "diamonds": 1499},
+    "Diamond": {"price": 1999, "diamonds": 1999},
+    "Starter Pack": {"price": 100, "diamonds": 200},
+    "Pro Pack": {"price": 500, "diamonds": 800},
+}
+
+
+def _resolve_plan_values(plan_name: str, price: int | None = None, diamonds: int | None = None) -> tuple[int | None, int | None]:
+    plan = PLAN_CATALOG.get(plan_name)
+    if not plan:
+        return price, diamonds
+    return plan["price"], plan["diamonds"]
+
+
+# ── Debug endpoint (public) ───────────────────────────────────────────────────
+@router.get("/payment/status")
+async def payment_status():
+    """Check if Razorpay is properly configured. Hit /api/payment/status in browser."""
+    key_id  = os.getenv("RZP_KEY_ID", "")
+    secret  = os.getenv("RZP_SECRET", "")
+    return {
+        "razorpay_library": _razorpay_available,
+        "key_id_set":  bool(key_id)  and key_id.startswith("rzp_"),
+        "secret_set":  bool(secret),
+        "mode":        "test" if key_id.startswith("rzp_test_") else "live" if key_id.startswith("rzp_live_") else "unknown",
+        "ready":       _razorpay_available and bool(key_id) and bool(secret),
+    }
 
 # ── Auth helpers ──────────────────────────────────────────────────────────────
 SECRET_KEY = os.getenv("JWT_SECRET", "super-secret-key-datalytics")
@@ -109,16 +146,17 @@ async def get_user_diamonds(email: str = Depends(get_current_user_email)):
 async def buy_plan(req: BuyPlanRequest, email: str = Depends(get_current_user_email)):
     """Create a Razorpay order for the chosen plan."""
     rzp = get_rzp_client()
+    price, diamonds = _resolve_plan_values(req.plan_name, req.price, req.diamonds)
     
     if not rzp:
         print(f"[RAZORPAY] Keys missing or client init failed for {email}")
         return {
             "order_id": f"order_mock_{int(datetime.utcnow().timestamp())}",
-            "amount": req.price * 100,
+            "amount": price * 100,
             "currency": "INR",
             "key": os.getenv("RZP_KEY_ID", "rzp_test_placeholder"),
             "plan_name": req.plan_name,
-            "diamonds": req.diamonds,
+            "diamonds": diamonds,
             "email": email,
             "mock": True,
             "message": "Razorpay API keys are not configured. Using mock payment."
@@ -127,11 +165,11 @@ async def buy_plan(req: BuyPlanRequest, email: str = Depends(get_current_user_em
     try:
         print(f"[RAZORPAY] Creating order for {email}: {req.plan_name}")
         order_data = {
-            "amount": req.price * 100,  # paise
+            "amount": price * 100,  # paise
             "currency": "INR",
             "receipt": f"rcpt_{int(datetime.utcnow().timestamp())}",
             "payment_capture": 1,  # Auto capture
-            "notes": {"email": email, "plan": req.plan_name, "diamonds": req.diamonds, "mode": "test"},
+            "notes": {"email": email, "plan": req.plan_name, "diamonds": diamonds, "mode": "test"},
         }
         order = rzp.order.create(data=order_data)
         print(f"[RAZORPAY] Order created: {order['id']}")
@@ -142,7 +180,7 @@ async def buy_plan(req: BuyPlanRequest, email: str = Depends(get_current_user_em
             "currency": order["currency"],
             "key": os.getenv("RZP_KEY_ID", ""),
             "plan_name": req.plan_name,
-            "diamonds": req.diamonds,
+            "diamonds": diamonds,
             "email": email,
             "mock": False
         }
@@ -159,6 +197,7 @@ async def verify_payment(req: VerifyPaymentRequest, email: str = Depends(get_cur
     print(f"[PAYMENT] Verifying payment for {email}, order={req.razorpay_order_id}")
     rzp = get_rzp_client()
     is_mock = req.razorpay_order_id.startswith("order_mock_")
+    _, diamonds = _resolve_plan_values(req.plan_name, None, req.diamonds)
     
     try:
         if not is_mock:
@@ -185,13 +224,13 @@ async def verify_payment(req: VerifyPaymentRequest, email: str = Depends(get_cur
             "order_id": req.razorpay_order_id,
             "payment_id": req.razorpay_payment_id,
             "plan_name": req.plan_name,
-            "diamonds": req.diamonds,
+            "diamonds": diamonds,
             "timestamp": now,
             "status": "Paid",
             "mock": is_mock
         }
         
-        print(f"[PAYMENT] Updating DB for {email}: +{req.diamonds} diamonds")
+        print(f"[PAYMENT] Updating DB for {email}: +{diamonds} diamonds")
         
         # Pre-check: ensure diamonds is an integer (in case it was null)
         user_check = await db.users.find_one({"email": email})
@@ -201,7 +240,7 @@ async def verify_payment(req: VerifyPaymentRequest, email: str = Depends(get_cur
         result = await db.users.update_one(
             {"email": email},
             {
-                "$inc": {"diamonds": req.diamonds},
+                "$inc": {"diamonds": diamonds},
                 "$set": {"plan": req.plan_name, "last_payment_at": now},
                 "$push": {"purchase_history": history_entry},
             },

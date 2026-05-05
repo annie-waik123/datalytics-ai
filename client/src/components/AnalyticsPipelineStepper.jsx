@@ -53,16 +53,16 @@ export const ANALYTICS_PIPELINE_STEPS = [
     description: 'Evaluate strategic scenarios and optimize decision outcomes.',
   },
   {
-    id: 'reports',
-    icon: '📄',
-    label: 'Reports',
-    description: 'Generate shareable summaries for stakeholders and teams.',
-  },
-  {
     id: 'aiInsights',
     icon: '🧠',
     label: 'AI Insights',
     description: 'Draft an AI-assisted narrative around the final analysis.',
+  },
+  {
+    id: 'reports',
+    icon: '📄',
+    label: 'Reports',
+    description: 'Generate shareable summaries for stakeholders and teams.',
   },
 ]
 

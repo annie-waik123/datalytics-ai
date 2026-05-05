@@ -4,7 +4,7 @@
  *   2. ai_insights              → Deep AI pattern analysis & predictions
  *   3. recommendation_insights  → Executive business recommendations
  *
- * Powered by Groq llama-3.3-70b-versatile via backend API.
+ * Powered by the configured backend AI provider.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { IoLogoSnapchat } from 'react-icons/io5'
@@ -30,7 +30,7 @@ const MODES = [
     placeholder: 'Ask about your data, trends, averages…',
     color: '#6366f1',
     welcomeTitle: 'Dataset Assistant',
-    welcomeDesc: 'Ask about averages, trends, filters, record lookups, or any question about your uploaded data.',
+    welcomeDesc: 'ask about averages, trends, filters, or specific records.',
   },
   {
     id: 'ai_insights',
@@ -40,7 +40,7 @@ const MODES = [
     placeholder: 'Ask for patterns, anomalies, predictions, correlations…',
     color: '#8b5cf6',
     welcomeTitle: 'AI Intelligence Engine',
-    welcomeDesc: 'Powered by LLaMA 3.3 70B. Ask for hidden patterns, future predictions, anomalies, and deep data intelligence.',
+    welcomeDesc: 'ask about averages, trends, filters, or specific records.',
   },
   {
     id: 'recommendation_insights',
@@ -50,16 +50,14 @@ const MODES = [
     placeholder: 'Ask for business recommendations, strategy, growth opportunities…',
     color: '#0ea5e9',
     welcomeTitle: 'Business Intelligence Engine',
-    welcomeDesc: 'Get executive-level business recommendations, strategic opportunities, risk analysis, and decision intelligence from your data.',
+    welcomeDesc: 'ask about averages, trends, filters, or specific records.',
   },
 ]
 
 const QUICK_PROMPTS = {
   chat: [
     'What are the key columns in this dataset?',
-    'Show me the average values of numeric columns.',
     'How many rows does the dataset have?',
-    'Find the highest value in the dataset.',
   ],
   ai_insights: [
     'Find hidden patterns and anomalies in this data.',
@@ -77,6 +75,7 @@ const QUICK_PROMPTS = {
 
 const IDENTIFIER_HINTS = ['id', 'uuid', 'guid', 'index', 'serial', 'code', 'employeeid', 'empid']
 const DETAIL_QUERY_RE = /\b(detail|details|info|information|record|row|profile|employee)\b/i
+const RESPONSE_CACHE_VERSION = 'strict-2026-04-18'
 
 // ─── Utility Functions ────────────────────────────────────────────────────────
 
@@ -214,18 +213,114 @@ function applyParsedFilters(rows = [], filters = []) {
   )
 }
 
+function extractLookupValues(question, columns = []) {
+  const text = String(question || '')
+  const values = []
+  ;[/`([^`]+)`/g, /'([^']+)'/g, /"([^"]+)"/g].forEach((regex) => {
+    for (const match of text.matchAll(regex)) {
+      if (match[1]?.trim()) values.push(match[1].trim())
+    }
+  })
+  columns.forEach((column) => {
+    const escaped = escapeRegex(String(column))
+    const regex = new RegExp(`${escaped}\\s*(?:=|is|:)?\\s*([A-Za-z0-9_.-]+)`, 'ig')
+    for (const match of text.matchAll(regex)) {
+      if (match[1]?.trim() && normalizeText(match[1]) !== normalizeText(column)) values.push(match[1].trim())
+    }
+  })
+  const idMatches = text.match(/\b[A-Za-z]{1,12}[-_]\d+[A-Za-z0-9_.-]*\b|\b\d+(?:\.\d+)?\b/g) || []
+  values.push(...idMatches)
+  return Array.from(new Set(values.map((value) => String(value).trim()).filter(Boolean))).slice(0, 6)
+}
+
+function findExactRows(rows = [], columns = [], question = '', matchedColumns = []) {
+  const lookupValues = extractLookupValues(question, columns)
+  if (!lookupValues.length) return null
+  const candidateColumns = [
+    ...matchedColumns,
+    ...columns.filter(isIdentifierColumn),
+    ...columns,
+  ].filter((column, index, list) => column && list.indexOf(column) === index)
+
+  for (const value of lookupValues) {
+    const wanted = String(value).trim().toLowerCase()
+    const wantedNumber = Number(String(value).replace(/,/g, ''))
+    for (const column of candidateColumns) {
+      const matches = rows
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => {
+          const raw = row?.[column]
+          const left = String(raw ?? '').trim().toLowerCase()
+          if (left === wanted) return true
+          const numeric = Number(raw)
+          return Number.isFinite(wantedNumber) && Number.isFinite(numeric) && numeric === wantedNumber
+        })
+      if (matches.length) return { column, value, matches }
+    }
+  }
+  return null
+}
+
+function buildRowDetailAnswer(match, columns = []) {
+  const shown = match.matches.slice(0, 5)
+  const lines = [
+    `Found ${match.matches.length.toLocaleString()} matching row${match.matches.length === 1 ? '' : 's'} where \`${match.column}\` = \`${match.value}\` in the loaded dataset.`,
+    '',
+  ]
+  shown.forEach(({ row, index }, displayIndex) => {
+    lines.push(`Match ${displayIndex + 1} (dataset row index ${index}):`)
+    columns.forEach((column) => {
+      const value = row?.[column]
+      lines.push(`- \`${column}\`: ${value === null || value === undefined || value === '' ? 'N/A' : String(value)}`)
+    })
+    lines.push('')
+  })
+  if (match.matches.length > shown.length) {
+    lines.push(`Showing first ${shown.length} matches; ${match.matches.length - shown.length} more matching rows exist.`)
+  }
+  return lines.join('\n').trim()
+}
+
 function resolveLocalDatasetQuery(question, dataset, datasetProfile) {
   if (!dataset || !datasetProfile || !Array.isArray(dataset.rows) || !dataset.rows.length) return null
   const rows = dataset.rows
   const columns = dataset.columns || Object.keys(rows[0] || {})
   const types = datasetProfile.types || {}
   const numericColumns = datasetProfile.numericColumns || []
+  const numericStats = datasetProfile.numericStats || {}
   const lower = String(question || '').toLowerCase()
   const matchedColumns = matchColumns(lower, columns)
   const filters = parseFilters(lower, columns, types)
   const filteredRows = applyParsedFilters(rows, filters)
   const totalRows = filters.length ? filteredRows.length : (datasetProfile.totalRowCount || datasetProfile.rowCount || rows.length)
   const targetNumeric = matchedColumns.find((col) => numericColumns.includes(col)) || numericColumns[0]
+  const totalColumns = datasetProfile.totalColumnCount || datasetProfile.columnCount || columns.length
+
+  if (/(detail|details|show|find|lookup|row|record|transaction|product|customer|order|sku|id)/.test(lower)) {
+    const exactMatch = findExactRows(rows, columns, question, matchedColumns)
+    if (exactMatch) {
+      return {
+        answer: buildRowDetailAnswer(exactMatch, columns),
+        chart: null,
+      }
+    }
+  }
+
+  if (/(how many columns|number of columns|total columns)/.test(lower)) {
+    return {
+      answer: `The dataset has ${totalColumns.toLocaleString()} columns.`,
+      chart: null,
+    }
+  }
+
+  if (/(key columns|which columns|what columns|column names|fields|headers|schema)/.test(lower)) {
+    const preview = columns.slice(0, 12)
+    const suffix = columns.length > preview.length ? `, and ${columns.length - preview.length} more` : ''
+    return {
+      answer: `This dataset has ${totalColumns.toLocaleString()} columns. The columns are: ${preview.join(', ')}${suffix}.`,
+      chart: null,
+    }
+  }
 
   if (/(how many|count|number of|rows)/.test(lower) && !targetNumeric) {
     return {
@@ -246,7 +341,34 @@ function resolveLocalDatasetQuery(question, dataset, datasetProfile) {
     }
   }
 
+  if (/(average values|average of numeric columns|mean of numeric columns|numeric columns)/.test(lower) && numericColumns.length) {
+    const summary = numericColumns.slice(0, 5).map((column) => {
+      const stat = numericStats[column]
+      const values = filteredRows.map((r) => Number(r?.[column])).filter(Number.isFinite)
+      const value = Number.isFinite(stat?.mean)
+        ? stat.mean
+        : (values.length ? values.reduce((sum, item) => sum + item, 0) / values.length : NaN)
+      return Number.isFinite(value) ? `${column}: ${formatMetric(value)}` : null
+    }).filter(Boolean)
+    if (!summary.length) return null
+    return {
+      answer: `Average values for numeric columns: ${summary.join(', ')}.`,
+      chart: null,
+    }
+  }
+
   return null
+}
+
+function sanitizeAssistantContent(content) {
+  const lines = String(content || '').split('\n')
+  while (lines.length && /^\s*MODE\s*:\s*["']?.+["']?\s*$/i.test(lines[0].trim())) {
+    lines.shift()
+  }
+  while (lines.length && !lines[0].trim()) {
+    lines.shift()
+  }
+  return lines.join('\n').trim()
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -365,15 +487,22 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
   const [groqStatus, setGroqStatus] = useState(null) // null | 'ok' | 'error'
+  const [llmMeta, setLlmMeta] = useState({ model: 'AI Model', provider: '' })
   const messagesRef = useRef(null)
   const historyLoadedRef = useRef(false)
   const inputRef = useRef(null)
+  const responseCacheRef = useRef(new Map())
   const hasDataset = Boolean(dataset)
 
   // Check AI service health on mount
   useEffect(() => {
     checkChatHealth().then((health) => {
-      setGroqStatus(health?.groq_configured ? 'ok' : 'error')
+      const configured = Boolean(health?.configured ?? health?.groq_configured)
+      setGroqStatus(configured ? 'ok' : 'error')
+      setLlmMeta({
+        model: health?.model || 'AI Model',
+        provider: health?.provider || '',
+      })
     }).catch(() => setGroqStatus('error'))
   }, [])
 
@@ -383,7 +512,7 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
   const getWelcomMessage = useCallback((modeId) => {
     const mode = MODES.find((m) => m.id === modeId) || MODES[0]
     const datasetInfo = hasDataset
-      ? `Working with **${dataset.name}**. ${mode.welcomeDesc}`
+      ? `Analyze your dataset with AI — ${mode.welcomeDesc}`
       : mode.welcomeDesc
     return buildMessage('assistant', datasetInfo, { mode: modeId, source: 'system' })
   }, [hasDataset, dataset])
@@ -443,27 +572,13 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
 
   /** Stream text character by character for visual effect */
   function streamResponse(text) {
-    return new Promise((resolve) => {
-      let index = 0
-      const safeText = String(text || '')
-      // For long responses, jump ahead faster
-      const stepSize = safeText.length > 500 ? 4 : 1
-
-      const step = () => {
-        index = Math.min(index + stepSize, safeText.length)
-        setStreamingText(safeText.slice(0, index))
-        if (index >= safeText.length) {
-          resolve()
-          return
-        }
-        requestAnimationFrame(step)
-      }
-      requestAnimationFrame(step)
-    })
+    const safeText = String(text || '')
+    setStreamingText(safeText)
+    return Promise.resolve()
   }
 
   /** Select the correct API function based on mode.
-   * Always calls backend — Groq receives the actual CSV data and resolves columns correctly.
+   * Always calls backend — the configured LLM provider receives the actual CSV data and resolves columns correctly.
    * (Local frontend engine was removed because it picked the wrong column, e.g., EmployeeID instead of Salary.)
    */
   async function callModeAPI(message, mode) {
@@ -477,6 +592,22 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
     }
   }
 
+  function responseCacheKey(mode, question) {
+    const datasetSignature = dataset
+      ? `${dataset.name || 'dataset'}:${datasetProfile?.totalRowCount || datasetProfile?.rowCount || dataset?.rows?.length || 0}`
+      : 'no-dataset'
+    return `${RESPONSE_CACHE_VERSION}::${datasetSignature}::${mode}::${String(question || '').trim().toLowerCase()}`
+  }
+
+  function getCachedResponse(mode, question) {
+    return responseCacheRef.current.get(responseCacheKey(mode, question)) || null
+  }
+
+  function setCachedResponse(mode, question, response) {
+    const key = responseCacheKey(mode, question)
+    responseCacheRef.current.set(key, response)
+  }
+
   async function handleSend(rawValue) {
     const value = String(rawValue ?? input).trim()
     if (!value || sending) return
@@ -488,9 +619,21 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
     setStreamingText('')
 
     try {
-      const response = await callModeAPI(value, activeMode)
-      const answer = response?.answer || response?.content || response?.reply || 'I could not generate a response for this request.'
+      const localResponse = activeMode === 'chat'
+        ? resolveLocalDatasetQuery(value, dataset, datasetProfile)
+        : null
+      const cachedResponse = localResponse ? null : getCachedResponse(activeMode, value)
+      const response = localResponse
+        ? { ...localResponse, source: 'local_fast_path' }
+        : (cachedResponse || await callModeAPI(value, activeMode))
+      const answer = sanitizeAssistantContent(
+        response?.answer || response?.content || response?.reply || 'I could not generate a response for this request.'
+      )
       const source = response?.source || 'groq'
+
+      if (!localResponse && !cachedResponse && source !== 'error') {
+        setCachedResponse(activeMode, value, response)
+      }
 
       // Stream the assistant response
       await streamResponse(answer)
@@ -561,7 +704,7 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
         className={`chatbot-fab ${open ? 'open' : ''}`}
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? 'Close AI chatbot' : 'Open AI chatbot'}
-        title="Datalytics AI Assistant"
+        title="Eighteen AI Assistant"
       >
         <BotLogo size="fab" className="chatbot-fab-logo" />
         {!open && (
@@ -572,7 +715,7 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
       </button>
 
       {open && (
-        <section className="chatbot-panel chatbot-panel--enhanced" aria-label="Datalytics AI Assistant">
+        <section className="chatbot-panel chatbot-panel--enhanced" aria-label="Eighteen AI Assistant">
 
           {/* Header */}
           <header className="chatbot-header">
@@ -582,8 +725,9 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
               </div>
               <div className="chatbot-header-copy">
                 <div className="chatbot-title-row">
-                  <div className="chatbot-title">Datalytics AI</div>
-                  <span className="chatbot-model-badge">llama-3.3-70b</span>
+                  <div className="chatbot-title">Eighteen AI</div>
+                  <span className="chatbot-model-badge">{llmMeta.model || 'AI Model'}</span>
+                  {llmMeta.provider ? <span className="chatbot-model-badge">{llmMeta.provider}</span> : null}
                   {groqStatus === 'ok' && <span className="chatbot-model-badge" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', marginLeft: 4 }}>✓ Live</span>}
                   {groqStatus === 'error' && <span className="chatbot-model-badge" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', marginLeft: 4 }}>⚠ Offline</span>}
                 </div>
@@ -647,7 +791,7 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
                   </div>
                   <div className="chatbot-msg-content">
                     <div className="chatbot-msg-meta">
-                      <span className="chatbot-msg-author">{isUser ? 'You' : 'Datalytics AI'}</span>
+                      <span className="chatbot-msg-author">{isUser ? 'You' : 'Eighteen AI'}</span>
                       {message.mode && !isUser && <MessageModeTag mode={message.mode} />}
                       <span className="chatbot-msg-time">{formatTime(message.createdAt)}</span>
                     </div>
@@ -668,9 +812,87 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
                           </div>
                         </div>
                       ) : null}
+                      {/* ── Add to Dashboard button ── */}
+                      {!isUser && !isSystemWelcome && (
+                        <div style={{ marginTop: '6px', display: 'flex', justifyContent: 'flex-end' }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              const btnEl = e.currentTarget
+                              // Fly animation
+                              const sidebarEl =
+                                document.querySelector('.ds-sidebar') ||
+                                document.querySelector('[class*="sidebar"]') ||
+                                document.querySelector('nav')
+                              const originRect = btnEl.getBoundingClientRect()
+                              const targetRect = sidebarEl
+                                ? sidebarEl.getBoundingClientRect()
+                                : { left: 0, top: window.innerHeight / 2, width: 240 }
+                              const particle = document.createElement('div')
+                              particle.style.cssText = `
+                                position:fixed;z-index:9999;width:40px;height:40px;border-radius:50%;
+                                background:linear-gradient(135deg,#22c55e,#f97316);
+                                box-shadow:0 0 18px rgba(34,197,94,0.8);
+                                display:flex;align-items:center;justify-content:center;
+                                font-size:16px;color:white;pointer-events:none;
+                                top:${originRect.top + originRect.height / 2 - 20}px;
+                                left:${originRect.left + originRect.width / 2 - 20}px;
+                                transition:all 0.75s cubic-bezier(0.23,1,0.32,1);opacity:1;
+                              `
+                              particle.textContent = '📊'
+                              document.body.appendChild(particle)
+                              requestAnimationFrame(() => {
+                                particle.style.top = `${targetRect.top + targetRect.height / 2 - 20}px`
+                                particle.style.left = `${targetRect.left + targetRect.width / 2 - 20}px`
+                                particle.style.transform = 'scale(0.3)'
+                                particle.style.opacity = '0'
+                              })
+                              setTimeout(() => {
+                                particle.remove()
+                                window.dispatchEvent(new CustomEvent('datalytics:create-dashboard-widget', {
+                                  detail: {
+                                    chart_type: 'text_box',
+                                    title: 'AI Insight',
+                                    insight: message.content,
+                                  }
+                                }))
+                              }, 780)
+                            }}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              fontSize: '0.68rem',
+                              fontWeight: 700,
+                              padding: '4px 10px',
+                              borderRadius: '16px',
+                              border: '1px solid rgba(34,197,94,0.35)',
+                              background: 'rgba(34,197,94,0.08)',
+                              color: '#22c55e',
+                              cursor: 'pointer',
+                              letterSpacing: '0.04em',
+                              transition: 'all 0.2s ease',
+                            }}
+                            onMouseEnter={e => {
+                              e.currentTarget.style.background = 'rgba(34,197,94,0.18)'
+                              e.currentTarget.style.boxShadow = '0 0 10px rgba(34,197,94,0.3)'
+                            }}
+                            onMouseLeave={e => {
+                              e.currentTarget.style.background = 'rgba(34,197,94,0.08)'
+                              e.currentTarget.style.boxShadow = 'none'
+                            }}
+                          >
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M3 3h18v18H3z" /><path d="M3 9h18M9 21V9" />
+                            </svg>
+                            + Add to Dashboard
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
+
               )
             })}
 
@@ -682,7 +904,7 @@ export default function ChatBot({ dataset, datasetProfile, profileAvatar, profil
                 </div>
                 <div className="chatbot-msg-content">
                   <div className="chatbot-msg-meta">
-                    <span className="chatbot-msg-author">Datalytics AI</span>
+                    <span className="chatbot-msg-author">Eighteen AI</span>
                     <MessageModeTag mode={activeMode} />
                   </div>
                   <div className="chatbot-msg-surface">

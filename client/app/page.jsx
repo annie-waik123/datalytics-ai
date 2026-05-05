@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { FaInstagram, FaLinkedin, FaGithub, FaGlobe } from "react-icons/fa";
 import AnalyticsPipelineStepper from "../src/components/AnalyticsPipelineStepper.jsx";
@@ -9,8 +9,6 @@ import AuthSystem from "../src/auth/AuthSystem.jsx";
 // import AuthModal from "../src/components/auth/AuthModal.jsx";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
@@ -283,6 +281,65 @@ const styles = `
   .feat-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 10px; }
   .feat-desc { font-size: 0.82rem; color: rgba(255,255,255,0.5); line-height: 1.65; }
 
+  /* PRODUCT PREVIEW */
+  .product-preview { padding: 60px 3% 80px; position: relative; z-index: 1; }
+  .preview-browser { max-width: 1200px; margin: 0 auto; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 100px rgba(255,77,46,0.1); animation: previewFloat 6s ease-in-out infinite; }
+  @keyframes previewFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+  .preview-bar { background: #1a1d2e; padding: 14px 22px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .preview-dots { display:flex; gap:7px; }
+  .preview-dot { width:13px; height:13px; border-radius:50%; }
+  .pd-red{background:#ff5f57;} .pd-yellow{background:#ffbd2e;} .pd-green{background:#28c840;}
+  .preview-url { flex:1; background:rgba(255,255,255,0.05); border-radius:6px; padding:6px 16px; font-size:0.78rem; color:rgba(255,255,255,0.4); font-family:monospace; }
+  .preview-badge { font-size:0.68rem; color:#22c55e; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.2); padding:4px 12px; border-radius:10px; font-weight:600; white-space:nowrap; }
+  .preview-tabs { background:#13172a; border-bottom:1px solid rgba(255,255,255,0.06); display:flex; gap:0; overflow-x:auto; scrollbar-width:none; }
+  .preview-tabs::-webkit-scrollbar{display:none;}
+  .preview-tab { background:none; border:none; border-bottom:2px solid transparent; padding:10px 20px; font-size:0.75rem; font-weight:600; color:rgba(255,255,255,0.4); cursor:pointer; white-space:nowrap; font-family:inherit; transition:all 0.2s; }
+  .preview-tab:hover { color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.03); }
+  .preview-tab.active { color:#fff; border-bottom-color:var(--orange); background:rgba(255,106,0,0.06); }
+  .preview-content { background:#0d1225; display:grid; grid-template-columns:240px 1fr; min-height:500px; }
+  .preview-sidebar { background:#0a0e1a; border-right:1px solid rgba(255,255,255,0.05); padding:20px 0; }
+  .ps-logo { padding:0 20px 20px; font-weight:800; font-size:1rem; color:#fff; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:12px; }
+  .ps-logo span{color:var(--red);}
+  .ps-label { padding:0 20px; font-size:0.6rem; font-weight:700; letter-spacing:1.5px; color:rgba(255,255,255,0.25); text-transform:uppercase; margin-bottom:8px; margin-top:4px; }
+  .ps-item { display:flex; align-items:center; justify-content:space-between; padding:10px 20px; font-size:0.78rem; color:rgba(255,255,255,0.55); cursor:default; transition:all 0.2s; }
+  .ps-item.active { background:rgba(255,106,0,0.12); color:#fff; border-left:2px solid var(--orange); }
+  .ps-item-left { display:flex; align-items:center; gap:10px; }
+  .ps-badge { font-size:0.58rem; padding:2px 7px; border-radius:8px; font-weight:700; }
+  .psb-done { background:rgba(34,197,94,0.15); color:#4ade80; }
+  .psb-prog { background:rgba(255,106,0,0.15); color:#fb923c; }
+  .preview-progress { padding:20px; border-top:1px solid rgba(255,255,255,0.05); margin-top:auto; }
+  .pp-label { font-size:0.6rem; color:rgba(255,255,255,0.3); font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
+  .pp-bar-bg { height:4px; background:rgba(255,255,255,0.06); border-radius:4px; overflow:hidden; }
+  .pp-bar-fill { height:100%; width:40%; background:linear-gradient(90deg,var(--red),var(--orange)); border-radius:4px; animation:ppFill 2s ease both; }
+  @keyframes ppFill { from{width:0;} to{width:40%;} }
+  .pp-sub { font-size:0.62rem; color:rgba(255,255,255,0.25); margin-top:6px; }
+  .preview-main { padding:28px 30px; }
+  .pm-title { font-size:1.3rem; font-weight:800; color:#fff; margin-bottom:4px; }
+  .pm-sub { font-size:0.78rem; color:rgba(255,255,255,0.35); margin-bottom:22px; }
+  .pm-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:22px; }
+  .pm-stat { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); border-radius:12px; padding:14px 16px; }
+  .pm-stat-label { font-size:0.6rem; color:rgba(255,255,255,0.35); font-weight:600; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px; }
+  .pm-stat-val { font-size:1.6rem; font-weight:900; color:#fff; }
+  .pm-stat-val.green{color:#4ade80;} .pm-stat-val.purple{color:#c084fc;}
+  .pm-table { background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; overflow:hidden; }
+  .pm-thead { display:grid; grid-template-columns:1.5fr 1fr 0.8fr 1.2fr; padding:10px 16px; background:rgba(255,255,255,0.03); font-size:0.65rem; font-weight:700; color:rgba(255,255,255,0.35); letter-spacing:1px; text-transform:uppercase; }
+  .pm-row { display:grid; grid-template-columns:1.5fr 1fr 0.8fr 1.2fr; padding:11px 16px; font-size:0.78rem; color:rgba(255,255,255,0.75); border-top:1px solid rgba(255,255,255,0.04); transition:background 0.2s; }
+  .pm-row:hover { background:rgba(255,255,255,0.03); }
+  .pm-type-cat{color:#60a5fa;} .pm-type-num{color:#4ade80;} .pm-type-dt{color:#f59e0b;}
+  .pm-null-ok{color:#4ade80;} .pm-null-warn{color:#fb923c;}
+  .pm-charts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 10px;}
+  .pm-chart-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 16px; height: 180px; display: flex; flex-direction: column; }
+  .pm-chart-title { font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 12px; }
+  .pm-chart-mock { flex: 1; display: flex; align-items: flex-end; gap: 8px; justify-content: center; position: relative; }
+  .pm-chart-mock.bar-chart div { width: 30px; background: rgba(59,130,246,0.5); border-radius: 4px 4px 0 0; animation: barRise 0.8s ease backwards; }
+  @keyframes barRise { from{height:0} }
+  .pm-chart-mock.pie-chart { align-items: center; }
+  .pie-slice { width: 100px; height: 100px; border-radius: 50%; background: conic-gradient(var(--orange) 0% 40%, #3b82f6 40% 70%, #22c55e 70% 100%); animation: spinIn 1s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes spinIn { from{transform:scale(0) rotate(-180deg);} to{transform:scale(1) rotate(0);} }
+
+  /* live dot */
+  .live-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#22c55e; box-shadow:0 0 8px #22c55e; animation:pulseDot 1.5s ease-in-out infinite; margin-right:6px; }
+
   .old-way { padding: 80px 5% 100px; }
   .old-way-cards { display: flex; flex-direction: column; gap: 16px; position: relative; max-width: 800px; margin: 0 auto; }
   .old-card { display: flex; align-items: center; gap: 20px; padding: 24px 30px; background: rgba(255, 77, 46, 0.03); border: 1px solid rgba(255, 77, 46, 0.15); border-radius: 16px; transition: transform 0.3s ease, background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; position: relative; overflow: hidden; cursor: none; animation: cardRise 0.6s cubic-bezier(0.16,1,0.3,1) both; }
@@ -392,9 +449,9 @@ const styles = `
   .partners { padding: 50px 5% 80px; overflow: hidden; }
   .partners-label { text-align: center; font-size: 0.8rem; font-weight: 500; color: rgba(255,255,255,0.3); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 36px; }
   .marquee-track { display: flex; gap: 0; overflow: hidden; }
-  .marquee-inner { display: flex; gap: 0; animation: marquee 30s linear infinite; }
+  .marquee-inner { display: flex; gap: 0; animation: marquee 30s linear infinite; width: max-content; }
   @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-  .marquee-item { display: flex; align-items: center; gap: 10px; padding: 0 40px; font-size: 1rem; font-weight: 700; color: rgba(255,255,255,0.22); white-space: nowrap; transition: color 0.3s; }
+  .marquee-item { flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 0 40px; font-size: 1rem; font-weight: 700; color: rgba(255,255,255,0.22); white-space: nowrap; transition: color 0.3s; }
   .marquee-item:hover { color: rgba(255,255,255,0.55); }
   .marquee-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.15); }
 
@@ -622,9 +679,42 @@ const styles = `
   .badge-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.6); animation: pulseDot 2s ease-in-out infinite; }
   @keyframes pulseDot { 0%,100%{transform:scale(1);} 50%{transform:scale(1.3);} }
 
+  .zoom-typing-text {
+    position: absolute;
+    top: calc(100% + 16px);
+    left: 65%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    overflow: hidden;
+    border-right: 2px solid orange;
+    font-size: 10px;
+    color: #f97316;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    width: 330px;
+    animation: typingZoom 5s steps(50, end) infinite, blinkCaret 0.75s step-end infinite;
+    text-shadow: 0 0 5px rgba(249,115,22,0.4);
+    pointer-events: none;
+  }
+  @media (max-width: 1024px) {
+    .zoom-typing-text { display: none !important; }
+  }
+  @keyframes typingZoom {
+    0%, 15% { width: 0; }
+    50%, 85% { width: 330px; }
+    100% { width: 0; }
+  }
+  @keyframes blinkCaret {
+    from, to { border-color: transparent }
+    50% { border-color: orange; }
+  }
   /* REVEAL */
   .reveal { opacity: 0; transform: translateY(40px); transition: all 0.7s cubic-bezier(0.16,1,0.3,1); }
   .reveal.up { opacity: 1; transform: translateY(0); }
+  /* product preview always visible */
+  .product-preview .reveal,
+  .product-preview .reveal-delay-1,
+  .product-preview .reveal-delay-2 { opacity: 1 !important; transform: none !important; }
   .reveal-delay-1 { transition-delay: 0.1s; }
   .reveal-delay-2 { transition-delay: 0.2s; }
   .reveal-delay-3 { transition-delay: 0.3s; }
@@ -676,9 +766,491 @@ const styles = `
     .hero-sub { font-size: 0.9rem; }
     .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
   }
+
+  /* LANDING PAGE MOBILE RESPONSIVE HARDENING */
+  @media (max-width: 900px) {
+    .mm-wrap { width: 100%; overflow-x: hidden; }
+    nav.mm-nav { height: 64px; padding: 0 18px; }
+    .logo { font-size: 1.08rem; min-width: 0; }
+    .nav-actions { gap: 0.5rem; }
+    .mobile-menu {
+      width: min(88vw, 360px);
+      align-items: stretch;
+      justify-content: flex-start;
+      padding: 96px 24px 32px;
+      overflow-y: auto;
+    }
+    .mobile-nav-links { align-items: stretch; gap: 0.65rem; margin-bottom: 1.5rem; }
+    .mobile-nav-links a {
+      display: block;
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 1rem;
+      text-align: left;
+    }
+    .mobile-nav-actions { width: 100%; }
+
+    .hero {
+      min-height: auto;
+      padding: 96px 20px 32px;
+      gap: 18px;
+    }
+    .hero-left { margin-bottom: 14px; }
+    .hero-eyebrow { font-size: 0.74rem; line-height: 1.5; margin-bottom: 14px; }
+    .hero-h1 {
+      font-size: clamp(2.2rem, 11vw, 3.4rem);
+      line-height: 1.05;
+      margin-bottom: 16px;
+      letter-spacing: 0;
+    }
+    .hero-sub { margin-bottom: 24px; line-height: 1.55; }
+    .hero-btns { width: 100%; }
+    .btn-primary, .btn-secondary {
+      min-height: 54px;
+      width: min(100%, 360px);
+      padding: 15px 20px;
+      border-radius: 12px;
+      font-size: 1rem;
+      white-space: normal;
+      line-height: 1.25;
+    }
+    .hero-right {
+      min-height: 340px;
+      overflow: hidden;
+      perspective: 1000px;
+      margin-top: 4px;
+    }
+
+    .pipeline-strip, .partners, .features, .product-preview, .old-way,
+    .services, .metrics, .testimonials, .pricing, .faq, .cta-section,
+    .contact-section {
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+    .section-head { margin-bottom: 34px; text-align: center; }
+    .section-head .section-sub, .section-sub { margin-left: auto; margin-right: auto; }
+    .section-divider { margin-left: auto; margin-right: auto; }
+    .section-title { font-size: clamp(1.85rem, 8vw, 2.55rem); line-height: 1.12; }
+
+    .pipeline-strip { padding-top: 42px; padding-bottom: 52px; }
+    .pipeline-track {
+      justify-content: flex-start;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      padding: 10px 6px 22px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .pl-node { min-width: 86px; scroll-snap-align: center; }
+    .pl-circle { width: 60px; height: 60px; font-size: 1.45rem; }
+    .pl-circle::after { transform-origin: 3px 33px; }
+    .pl-arrow-line { width: 24px; }
+    .pl-label { max-width: 84px; }
+
+    .preview-browser { border-radius: 14px; animation: none; }
+    .preview-bar { padding: 12px; gap: 9px; }
+    .preview-url { min-width: 0; padding: 6px 10px; font-size: 0.66rem; overflow: hidden; text-overflow: ellipsis; }
+    .preview-badge { display: none; }
+    .preview-content { grid-template-columns: 1fr; min-height: auto; }
+    .preview-sidebar { display: none; }
+    .preview-main { padding: 18px; }
+    .pm-title { font-size: 1.08rem; }
+    .pm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pm-stat { padding: 12px; }
+    .pm-stat-val { font-size: 1.28rem; }
+    .pm-table { overflow-x: auto; }
+    .pm-thead, .pm-row { min-width: 560px; }
+    .pm-charts-grid { grid-template-columns: 1fr; }
+
+    .features-grid, .services-grid-10, .testi-grid, .pricing-grid {
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+    .feat-card, .service-card-10, .testi-card, .price-card {
+      border-radius: 16px;
+      padding: 22px 18px;
+    }
+    .service-card-10, .old-card { cursor: default; }
+    .sc10-cursor, .old-cursor { display: none; }
+
+    .old-way { padding-top: 52px; padding-bottom: 64px; }
+    .old-way .section-title { font-size: clamp(2rem, 9vw, 2.6rem) !important; }
+    .old-way-cards { gap: 12px; }
+    .old-card { align-items: flex-start; padding: 18px; gap: 14px; }
+    .old-text { font-size: 0.9rem; line-height: 1.55; }
+
+    .metrics-inner {
+      border-radius: 20px;
+      padding: 24px 18px;
+      gap: 28px;
+    }
+    .metric-big-card {
+      align-items: flex-start;
+      padding: 18px;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .mbc-change { width: 100%; padding-left: 64px; }
+
+    .price-card.featured, .price-card.featured:hover { transform: none; }
+    .price-amount { font-size: 2.25rem; }
+    .pricing [style*="height: 40px"] { height: auto !important; min-height: 0; }
+    .pricing > div[style*="justify-content: center"] > div {
+      width: 100%;
+      justify-content: center;
+      text-align: center;
+      flex-wrap: wrap;
+    }
+
+    .faq-q { align-items: flex-start; gap: 14px; padding: 18px; font-size: 0.9rem; }
+    .faq-a, .faq-item.open .faq-a { padding-left: 18px; padding-right: 18px; }
+    .faq-item.open .faq-a { max-height: 360px; padding-bottom: 18px; }
+
+    .cta-section { padding-top: 24px; padding-bottom: 64px; }
+    .cta-inner { border-radius: 22px; padding: 44px 20px; }
+    .cta-title { font-size: clamp(2rem, 9vw, 2.6rem); line-height: 1.12; }
+    .cta-note { line-height: 1.7; }
+
+    .contact-wrapper {
+      border-radius: 22px;
+      padding: 28px 18px;
+      gap: 28px;
+    }
+    .contact-info-side { padding-right: 0; text-align: center; }
+    .contact-info-h2 { font-size: clamp(2rem, 9vw, 2.5rem); }
+    .contact-features-list { align-items: stretch; }
+    .contact-feature-item { align-items: flex-start; text-align: left; }
+    .contact-card { border-radius: 18px; padding: 22px 18px; }
+    .contact-title { text-align: center; font-size: 1.45rem; }
+    .form-input, .form-textarea { width: 100%; padding: 13px 14px; }
+
+    .footer-top {
+      grid-template-columns: 1fr;
+      gap: 28px;
+      padding: 54px 20px 42px;
+      text-align: center;
+    }
+    .footer-brand p { max-width: none; margin-left: auto; margin-right: auto; }
+    .footer-brand .footer-logo, .footer-social { justify-content: center; }
+    .footer-col ul { align-items: center; }
+    .footer-link-desc { display: none; }
+    .footer-bottom { justify-content: center; text-align: center; padding: 18px 20px 24px; }
+  }
+
+  @media (max-width: 600px) {
+    .blob { filter: blur(54px); opacity: 0.35; }
+    nav.mm-nav { padding: 0 14px; }
+    .mobile-menu { width: 100vw; border-left: 0; }
+    .hero { padding: 88px 16px 24px; }
+    .hero-right { min-height: 280px; }
+    .stage {
+      width: 420px;
+      height: 360px;
+      transform: rotateX(8deg) rotateY(-6deg) scale(0.55) !important;
+      transform-origin: center center;
+    }
+    @keyframes stageFloatMobileSmall {
+      0%,100% { transform: rotateX(8deg) rotateY(-6deg) scale(0.55) translateY(0); }
+      50% { transform: rotateX(7deg) rotateY(-4deg) scale(0.55) translateY(-8px); }
+    }
+    .card-main { width: 286px; height: 198px; }
+    .card-donut { left: 0; bottom: 74px; }
+    .card-stats { right: 0; bottom: 74px; }
+    .card-ticker { top: 205px; }
+
+    .pipeline-strip, .partners, .features, .product-preview, .old-way,
+    .services, .metrics, .testimonials, .pricing, .faq, .cta-section,
+    .contact-section {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
+    .features { padding-top: 44px; padding-bottom: 58px; }
+    .product-preview, .services, .metrics, .testimonials, .pricing, .faq { padding-top: 52px; padding-bottom: 64px; }
+    .partners { padding-top: 34px; padding-bottom: 46px; }
+    .marquee-item { padding: 0 22px; font-size: 0.9rem; }
+    .pm-stats { grid-template-columns: 1fr; }
+    .pm-charts-grid { gap: 12px; }
+    .pm-chart-box { height: 150px; }
+    .metric-big-card { display: grid; grid-template-columns: 48px 1fr; }
+    .mbc-change { width: auto; padding-left: 0; grid-column: 2; }
+    .footer-social { gap: 12px; flex-wrap: wrap; }
+    .soc-btn { width: 46px; height: 46px; }
+  }
+
+  @media (max-width: 380px) {
+    .hero-h1 { font-size: 2rem; }
+    .hero-right { min-height: 250px; }
+    .stage { transform: rotateX(8deg) rotateY(-6deg) scale(0.49) !important; }
+    .btn-primary, .btn-secondary { font-size: 0.92rem; }
+    .section-title { font-size: 1.7rem; }
+    .preview-main, .contact-card { padding: 16px 14px; }
+  }
 `;
 
 // ── Sub-components ──────────────────────────────────────────
+
+// ── LiveCounter: counts up to target ─────────────
+function LiveCounter({ target, cls }) {
+  const [val, setVal] = useState(0);
+  useEffect(() => {
+    setVal(0);
+    let start = 0;
+    const step = Math.ceil(target / 30);
+    const id = setInterval(() => {
+      start = Math.min(start + step, target);
+      setVal(start);
+      if (start >= target) clearInterval(id);
+    }, 40);
+    return () => clearInterval(id);
+  }, [target]);
+  return <div className={`pm-stat-val${cls ? ' ' + cls : ''}`}>{val}</div>;
+}
+
+// ── ProductPreview: auto-cycling pipeline screens ──────────
+const PREVIEW_SCREENS = [
+  {
+    id: 'upload', sidebarActive: 'Dataset Upload',
+    title: 'Dataset Upload', sub: 'Drag and drop CSV, Excel, or JSON files',
+    stats: [
+      { label: 'Total Rows', val: 36, cls: '' }, { label: 'Columns', val: 10, cls: '' },
+      { label: 'Numeric', val: 5, cls: 'green' }, { label: 'Categorical', val: 4, cls: 'purple' },
+    ],
+    rows: [
+      { col: 'date', type: 'datetime', typeCls: 'pm-type-dt', nulls: 0, nullCls: 'pm-null-ok', sample: '2024-01-05' },
+      { col: 'region', type: 'categorical', typeCls: 'pm-type-cat', nulls: 0, nullCls: 'pm-null-ok', sample: 'West, East' },
+      { col: 'category', type: 'categorical', typeCls: 'pm-type-cat', nulls: 0, nullCls: 'pm-null-ok', sample: 'Furniture' },
+      { col: 'sales', type: 'numeric', typeCls: 'pm-type-num', nulls: 0, nullCls: 'pm-null-ok', sample: '4200' },
+      { col: 'profit', type: 'numeric', typeCls: 'pm-type-num', nulls: 0, nullCls: 'pm-null-ok', sample: '820' },
+      { col: 'discount', type: 'numeric', typeCls: 'pm-type-num', nulls: 1, nullCls: 'pm-null-warn', sample: '0.05' },
+      { col: 'satisfaction', type: 'numeric', typeCls: 'pm-type-num', nulls: 1, nullCls: 'pm-null-warn', sample: '4.6' },
+    ],
+  },
+  {
+    id: 'eda', sidebarActive: 'Data Exploration',
+    title: 'Data Exploration', sub: 'Automated correlation & distribution analysis',
+    stats: [
+      { label: 'Correlations', val: 12, cls: 'green' }, { label: 'Outliers', val: 3, cls: '' },
+      { label: 'Missing %', val: 2, cls: 'purple' }, { label: 'Features', val: 10, cls: '' },
+    ],
+    rows: [
+      { col: 'sales ↔ profit', type: 'pearson r', typeCls: 'pm-type-num', nulls: 0.87, nullCls: 'pm-null-ok', sample: 'Strong +ve' },
+      { col: 'discount ↔ profit', type: 'pearson r', typeCls: 'pm-type-dt', nulls: -0.65, nullCls: 'pm-null-warn', sample: 'Moderate -ve' },
+      { col: 'satisfaction', type: 'skewness', typeCls: 'pm-type-cat', nulls: 0.12, nullCls: 'pm-null-ok', sample: 'Normal dist.' },
+      { col: 'sales', type: 'kurtosis', typeCls: 'pm-type-num', nulls: 1.4, nullCls: 'pm-null-ok', sample: 'Light tail' },
+      { col: 'region', type: 'unique vals', typeCls: 'pm-type-cat', nulls: 4, nullCls: 'pm-null-ok', sample: 'N/S/E/W' },
+      { col: 'category', type: 'unique vals', typeCls: 'pm-type-cat', nulls: 6, nullCls: 'pm-null-ok', sample: '6 classes' },
+    ],
+  },
+  {
+    id: 'viz', sidebarActive: 'Visualization',
+    title: 'Visualization', sub: 'Interactive charts auto-generated from your dataset',
+    stats: [
+      { label: 'Charts', val: 8, cls: 'green' }, { label: 'Chart Types', val: 5, cls: '' },
+      { label: 'Filters', val: 3, cls: 'purple' }, { label: 'Exports', val: 4, cls: '' },
+    ],
+    rows: [
+      { col: 'Sales by Region', type: 'bar chart', typeCls: 'pm-type-num', nulls: 'Live', nullCls: 'pm-null-ok', sample: 'West leads' },
+      { col: 'Profit Trend', type: 'line chart', typeCls: 'pm-type-dt', nulls: 'Live', nullCls: 'pm-null-ok', sample: '+12% MoM' },
+      { col: 'Category Split', type: 'pie chart', typeCls: 'pm-type-cat', nulls: 'Live', nullCls: 'pm-null-ok', sample: '6 segments' },
+      { col: 'Sales vs Discount', type: 'scatter', typeCls: 'pm-type-num', nulls: 'Live', nullCls: 'pm-null-warn', sample: '-0.65 corr' },
+      { col: 'Satisfaction Dist.', type: 'histogram', typeCls: 'pm-type-cat', nulls: 'Live', nullCls: 'pm-null-ok', sample: 'Bell curve' },
+      { col: 'Heatmap', type: 'correlation', typeCls: 'pm-type-num', nulls: 'Live', nullCls: 'pm-null-ok', sample: '10×10 grid' },
+    ],
+  },
+  {
+    id: 'predict', sidebarActive: 'Prediction',
+    title: 'ML Prediction', sub: 'Auto-trained regression model · Target: sales',
+    stats: [
+      { label: 'Accuracy', val: 94, cls: 'green' }, { label: 'R² Score', val: 91, cls: 'green' },
+      { label: 'MAE', val: 38, cls: '' }, { label: 'Features', val: 8, cls: 'purple' },
+    ],
+    rows: [
+      { col: 'Random Forest', type: 'model', typeCls: 'pm-type-num', nulls: '94%', nullCls: 'pm-null-ok', sample: 'Best fit' },
+      { col: 'XGBoost', type: 'model', typeCls: 'pm-type-cat', nulls: '91%', nullCls: 'pm-null-ok', sample: 'Runner-up' },
+      { col: 'Linear Regr.', type: 'model', typeCls: 'pm-type-dt', nulls: '76%', nullCls: 'pm-null-warn', sample: 'Baseline' },
+      { col: 'discount', type: 'feature', typeCls: 'pm-type-num', nulls: 0.42, nullCls: 'pm-null-ok', sample: 'Top feature' },
+      { col: 'region', type: 'feature', typeCls: 'pm-type-cat', nulls: 0.31, nullCls: 'pm-null-ok', sample: 'High imp.' },
+      { col: 'category', type: 'feature', typeCls: 'pm-type-cat', nulls: 0.18, nullCls: 'pm-null-ok', sample: 'Mid imp.' },
+    ],
+  },
+  {
+    id: 'powerbi', sidebarActive: 'Power BI',
+    title: 'Power BI Dashboard', sub: 'Drag-and-drop dashboard builder with live data refresh',
+    stats: [
+      { label: 'Widgets', val: 12, cls: 'green' }, { label: 'Pages', val: 3, cls: '' },
+      { label: 'Filters', val: 6, cls: 'purple' }, { label: 'KPIs', val: 5, cls: 'green' },
+    ],
+    rows: [
+      { col: 'Total Sales KPI', type: 'card widget', typeCls: 'pm-type-num', nulls: 'Live', nullCls: 'pm-null-ok', sample: '₹1.52M' },
+      { col: 'Profit Margin', type: 'gauge', typeCls: 'pm-type-cat', nulls: 'Live', nullCls: 'pm-null-ok', sample: '19.5%' },
+      { col: 'Sales by Month', type: 'column chart', typeCls: 'pm-type-dt', nulls: 'Live', nullCls: 'pm-null-ok', sample: 'Jan-Dec' },
+      { col: 'Region Map', type: 'geo chart', typeCls: 'pm-type-num', nulls: 'Live', nullCls: 'pm-null-ok', sample: '4 regions' },
+      { col: 'Drill-through', type: 'table', typeCls: 'pm-type-cat', nulls: 'Live', nullCls: 'pm-null-warn', sample: 'Row-level' },
+      { col: 'Date Slicer', type: 'filter', typeCls: 'pm-type-dt', nulls: 'Live', nullCls: 'pm-null-ok', sample: 'Q1–Q4 2024' },
+    ],
+  },
+  {
+    id: 'ai', sidebarActive: 'Decision Engine',
+    title: 'AI Decision Engine', sub: 'Executive-level recommendations from your data',
+    stats: [
+      { label: 'Insights', val: 7, cls: 'green' }, { label: 'Actions', val: 4, cls: '' },
+      { label: 'Risk Flags', val: 2, cls: 'purple' }, { label: 'Conf. Score', val: 93, cls: 'green' },
+    ],
+    rows: [
+      { col: '📈 Boost West sales', type: 'priority', typeCls: 'pm-type-num', nulls: 'High', nullCls: 'pm-null-ok', sample: '+18% uplift' },
+      { col: '✂️ Cut discounts', type: 'priority', typeCls: 'pm-type-dt', nulls: 'High', nullCls: 'pm-null-ok', sample: '+12% margin' },
+      { col: '🔍 Furniture dip', type: 'alert', typeCls: 'pm-type-cat', nulls: 'Med', nullCls: 'pm-null-warn', sample: 'Q3 anomaly' },
+      { col: '🤖 Retrain model', type: 'action', typeCls: 'pm-type-num', nulls: 'Low', nullCls: 'pm-null-ok', sample: 'Monthly' },
+      { col: '⚠️ Low satisfaction', type: 'risk', typeCls: 'pm-type-dt', nulls: 'Med', nullCls: 'pm-null-warn', sample: '3 regions' },
+      { col: '📊 Q4 forecast', type: 'insight', typeCls: 'pm-type-cat', nulls: 'Low', nullCls: 'pm-null-ok', sample: '+22% YoY' },
+    ],
+  },
+];
+
+const SIDEBAR_ITEMS = [
+  { icon: '📁', label: 'Dataset Upload',  badge: 'DONE',        cls: 'psb-done', screenId: 'upload'  },
+  { icon: '🔍', label: 'Data Exploration',badge: 'DONE',        cls: 'psb-done', screenId: 'eda'     },
+  { icon: '📊', label: 'Visualization',   badge: 'DONE',        cls: 'psb-done', screenId: 'viz'     },
+  { icon: '🧩', label: 'Prediction',      badge: 'IN PROGRESS', cls: 'psb-prog', screenId: 'predict' },
+  { icon: '⚡', label: 'Power BI',        badge: 'DONE',        cls: 'psb-done', screenId: 'powerbi' },
+  { icon: '🧠', label: 'Decision Engine', badge: 'IN PROGRESS', cls: 'psb-prog', screenId: 'ai'      },
+];
+
+function ProductPreview() {
+  const [screenIdx, setScreenIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+
+  const switchTo = (i) => {
+    setFade(false);
+    setTimeout(() => { setScreenIdx(i); setFade(true); }, 300);
+  };
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      switchTo((screenIdx + 1) % PREVIEW_SCREENS.length);
+    }, 3500);
+    return () => clearInterval(id);
+  }, [screenIdx]);
+
+  const screen = PREVIEW_SCREENS[screenIdx];
+  const totalScreens = PREVIEW_SCREENS.length;
+  const progressPct = Math.round(((screenIdx + 1) / totalScreens) * 100);
+
+  return (
+    <div className="preview-browser">
+      {/* Browser chrome */}
+      <div className="preview-bar">
+        <div className="preview-dots">
+          <div className="preview-dot pd-red"/><div className="preview-dot pd-yellow"/><div className="preview-dot pd-green"/>
+        </div>
+        <div className="preview-url">datalytics18.com/app · Datalytics v1.18</div>
+        <div className="preview-badge"><span className="live-dot"/>End-to-end analytics pipeline</div>
+      </div>
+
+      {/* Tab bar */}
+      <div className="preview-tabs">
+        {PREVIEW_SCREENS.map((s, i) => (
+          <button key={s.id} className={`preview-tab${i === screenIdx ? ' active' : ''}`} onClick={() => switchTo(i)}>
+            {s.sidebarActive}
+          </button>
+        ))}
+      </div>
+
+      {/* App shell */}
+      <div className="preview-content" style={{ opacity: fade ? 1 : 0, transition: 'opacity 0.3s ease' }}>
+        {/* Sidebar — each item clickable */}
+        <div className="preview-sidebar" style={{ display: 'flex', flexDirection: 'column' }}>
+          <div className="ps-logo">● Data<span>lytics</span></div>
+          <div className="ps-label">Pipeline Modules</div>
+          {SIDEBAR_ITEMS.map((item, i) => {
+            const isActive = item.label === screen.sidebarActive;
+            return (
+              <div
+                key={item.label}
+                className={`ps-item${isActive ? ' active' : ''}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => switchTo(PREVIEW_SCREENS.findIndex(s => s.id === item.screenId))}
+              >
+                <div className="ps-item-left">
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </div>
+                <span className={`ps-badge ${item.cls}`}>{item.badge}</span>
+              </div>
+            );
+          })}
+          <div style={{ flex: 1 }}/>
+          <div className="preview-progress">
+            <div className="pp-label">Workflow Progress</div>
+            <div className="pp-bar-bg">
+              <div className="pp-bar-fill" style={{ width: `${progressPct}%`, transition: 'width 0.6s ease' }}/>
+            </div>
+            <div className="pp-sub">{screenIdx + 1} of {totalScreens} modules viewed</div>
+          </div>
+        </div>
+
+        {/* Main panel */}
+        <div className="preview-main">
+          <div className="pm-title">{screen.title}</div>
+          <div className="pm-sub">{screen.sub}</div>
+          <div className="pm-stats">
+            {screen.stats.map(s => (
+              <div key={s.label} className="pm-stat">
+                <div className="pm-stat-label">{s.label}</div>
+                <LiveCounter key={`${screen.id}-${s.label}`} target={s.val} cls={s.cls} />
+              </div>
+            ))}
+          </div>
+          {screen.id === 'viz' || screen.id === 'powerbi' ? (
+            <div className="pm-charts-grid">
+              <div className="pm-chart-box">
+                <div className="pm-chart-title">Sales by Region</div>
+                <div className="pm-chart-mock bar-chart">
+                  <div style={{height: '40%', animationDelay: '0s'}}></div>
+                  <div style={{height: '80%', background: 'var(--orange)', animationDelay: '0.1s'}}></div>
+                  <div style={{height: '60%', animationDelay: '0.2s'}}></div>
+                  <div style={{height: '90%', background: '#22c55e', animationDelay: '0.3s'}}></div>
+                </div>
+              </div>
+              <div className="pm-chart-box">
+                <div className="pm-chart-title">Profit Trend</div>
+                <div className="pm-chart-mock line-chart">
+                  <svg viewBox="0 0 100 40" preserveAspectRatio="none" style={{width: '100%', height: '100%', overflow: 'visible'}}>
+                    <path d="M0,40 L20,20 L40,30 L60,10 L80,15 L100,0" fill="none" stroke="var(--cyan)" strokeWidth="3" vectorEffect="non-scaling-stroke" style={{strokeDasharray: 200, strokeDashoffset: 200, animation: 'dash 1.5s ease forwards'}} />
+                  </svg>
+                  <style>{`@keyframes dash { to { stroke-dashoffset: 0; } }`}</style>
+                </div>
+              </div>
+              <div className="pm-chart-box">
+                <div className="pm-chart-title">Category Split</div>
+                <div className="pm-chart-mock pie-chart">
+                  <div className="pie-slice"></div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="pm-table">
+              <div className="pm-thead">
+                <span>Column</span><span>Type</span><span>Value</span><span>Sample</span>
+              </div>
+              {screen.rows.map((row, i) => (
+                <div key={i} className="pm-row">
+                  <span>{row.col}</span>
+                  <span className={row.typeCls}>{row.type}</span>
+                  <span className={row.nullCls}>{row.nulls}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.5)' }}>{row.sample}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function Navbar({ scrolled, onLaunch, onLogin }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -726,8 +1298,52 @@ function Navbar({ scrolled, onLaunch, onLogin }) {
   return (
     <nav className="mm-nav" style={scrolled ? { background: 'rgba(6,10,24,0.95)', boxShadow: '0 4px 30px rgba(0,0,0,0.4)' } : {}}>
       <a href="#" className="logo">
-        <div className="logo-icon">
-          <span /><span /><span />
+        <div style={{
+          position: 'relative',
+          width: '30px',
+          height: '22px',
+          perspective: '100px',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'center',
+          gap: '3px',
+          flexShrink: 0,
+        }}>
+          <div style={{
+            position: 'absolute',
+            bottom: '-3px', left: '50%',
+            transform: 'translateX(-50%)',
+            width: '28px', height: '7px',
+            background: 'radial-gradient(ellipse, rgba(255,110,0,0.6) 0%, transparent 70%)',
+            filter: 'blur(3px)',
+            borderRadius: '50%',
+            animation: 'logo3dPulse 2.5s ease-in-out infinite',
+          }} />
+          {[{ h: '55%' }, { h: '100%' }, { h: '72%' }].map((bar, i) => (
+            <div key={i} style={{
+              position: 'relative',
+              width: '6px', height: bar.h,
+              borderRadius: '2px',
+              background: 'linear-gradient(180deg, #ffb347 0%, #ff6d00 45%, #cc2800 100%)',
+              boxShadow: '0 2px 6px rgba(255,100,0,0.55), inset 0 1px 0 rgba(255,255,255,0.35)',
+              transform: 'rotateX(16deg) rotateY(-5deg)',
+              transformStyle: 'preserve-3d',
+              animation: `logo3dBob ${1.5 + i * 0.2}s ease-in-out ${i * 0.15}s infinite`,
+            }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 100%)', borderRadius: '2px 2px 0 0' }} />
+              <div style={{ position: 'absolute', top: 0, right: 0, width: '30%', height: '100%', background: 'linear-gradient(270deg, rgba(0,0,0,0.3) 0%, transparent 100%)', borderRadius: '0 2px 2px 0' }} />
+            </div>
+          ))}
+          <style>{`
+            @keyframes logo3dBob {
+              0%, 100% { transform: rotateX(16deg) rotateY(-5deg) translateY(0px); }
+              50% { transform: rotateX(16deg) rotateY(-5deg) translateY(-3px); }
+            }
+            @keyframes logo3dPulse {
+              0%, 100% { opacity: 0.5; transform: translateX(-50%) scaleX(1); }
+              50% { opacity: 1; transform: translateX(-50%) scaleX(1.25); }
+            }
+          `}</style>
         </div>
         Datalytics
       </a>
@@ -770,7 +1386,12 @@ function Navbar({ scrolled, onLaunch, onLogin }) {
       </ul>
       <div className="nav-actions">
         <button className="btn-login" onClick={onLogin}>Login</button>
-        <button className="btn-signup" onClick={onLaunch}>Start Analyzing 🚀</button>
+        <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
+          <button className="btn-signup" onClick={onLaunch}>Start Analyzing 🚀</button>
+          <div className="zoom-typing-text">
+            ⚡ For the best experience, set your browser zoom to 80%
+          </div>
+        </div>
         <button className={`hamburger ${mobileMenuOpen ? 'open' : ''}`} onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           <span /><span /><span />
         </button>
@@ -984,6 +1605,7 @@ export default function Datalytics() {
     const [contactMessage, setContactMessage] = useState('');
     const [contactDone, setContactDone] = useState(false);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [authView, setAuthView] = useState("signup");
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
   const [volumeVal, setVolumeVal] = useState('1.3B');
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -1040,13 +1662,38 @@ export default function Datalytics() {
 
       if (!res.ok) throw new Error(data.detail || 'Failed to create order');
 
+      if (data.mock) {
+        // Mock payment flow: skip Razorpay modal and verify mock directly
+        const verifyRes = await fetch('/api/payment/verify-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            razorpay_order_id: data.order_id,
+            razorpay_payment_id: "pay_mock_" + Date.now(),
+            razorpay_signature: "mock_signature",
+            plan_name: planName,
+            diamonds: diamonds
+          })
+        });
+        if (verifyRes.ok) {
+          router.push('/app');
+        } else {
+          const verifyData = await verifyRes.json();
+          setPaymentError(verifyData.detail || 'Mock verification failed');
+        }
+        return;
+      }
+
       const options = {
-        key: data.key_id,
+        key: data.key,
         amount: data.amount,
         currency: data.currency,
         name: 'Datalytics',
         description: `Purchase ${planName}`,
-        order_id: data.id,
+        order_id: data.order_id,
         handler: async function (response) {
           try {
             const verifyRes = await fetch('/api/payment/verify-payment', {
@@ -1101,10 +1748,21 @@ export default function Datalytics() {
   }, []);
 
   const handleLaunchApp = () => {
-    setIsLaunching(true);
+    let token = null;
+    if (typeof window !== 'undefined') {
+      token = localStorage.getItem('auth_token');
+    }
+    
+    if (!token || token === 'undefined' || token === 'null') {
+      setAuthView("login");
+      setIsLaunching(true);
+    } else {
+      router.push('/app');
+    }
   };
 
   const handleLoginOpen = () => {
+    setAuthView("login");
     setIsLaunching(true);
   };
 
@@ -1164,13 +1822,15 @@ export default function Datalytics() {
   }, []);
 
   const handleContact = () => {
-    if (contactEmail.includes('@') && contactName.length > 2) {
-      setContactDone(true);
-      // WhatsApp link format: https://wa.me/number?text=message
-      const message = `Hi, I'm ${contactName}. %0AEmail: ${contactEmail} %0AMessage: ${contactMessage}`;
-      const waUrl = `https://wa.me/8707080065?text=${message}`;
-      window.open(waUrl, '_blank');
+    if (!contactName.trim() || !contactEmail.includes('@')) {
+      alert("Please enter a valid name and email address.");
+      return;
     }
+    setContactDone(true);
+    // WhatsApp link format: https://wa.me/number?text=message
+    const message = encodeURIComponent(`Hi, I'm ${contactName}.\nEmail: ${contactEmail}\nMessage: ${contactMessage}`);
+    const waUrl = `https://wa.me/918707080065?text=${message}`;
+    window.open(waUrl, '_blank');
   };
 
   const features = [
@@ -1196,12 +1856,12 @@ export default function Datalytics() {
   ];
 
   const testimonials = [
-    { featured: true, avatar: '👨‍💼', avatarBg: 'linear-gradient(135deg,rgba(255,77,46,0.3),rgba(255,106,0,0.2))', avatarBorder: 'rgba(255,77,46,0.3)', text: '"Datalytics completely removed the headache of manual data cleaning. The way it handles CSV uploads and auto-detects schemas is flawless. Truly a beginner-friendly platform!"', name: 'Amit kr. sharma', role: 'Data Analyst' },
-    { featured: false, avatar: '👨‍💻', avatarBg: 'linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,102,255,0.2))', avatarBorder: 'rgba(0,212,255,0.3)', text: '"I\'m not a coder, but I built a full interactive Power BI-style dashboard in just minutes. The no-code layout is incredibly intuitive and the live visuals are stunning."', name: 'sachin', role: 'Business Owner' },
-    { featured: false, avatar: '👨‍🚀', avatarBg: 'linear-gradient(135deg,rgba(168,85,247,0.3),rgba(124,58,237,0.2))', avatarBorder: 'rgba(168,85,247,0.3)', text: '"The AI Chatbot feature is like having a data scientist on call 24/7. Asking questions in plain English and instantly getting charts back is a total game-changer."', name: 'abhishek', role: 'Product Manager' },
-    { featured: false, avatar: '🧑‍🎨', avatarBg: 'linear-gradient(135deg,rgba(34,197,94,0.3),rgba(22,163,74,0.2))', avatarBorder: 'rgba(34,197,94,0.3)', text: '"I\'ve tried many ETL tools, but the pipeline speed from raw data to an Auto-ML model here is unmatched. It feels like an entire engineering team in one UI."', name: 'gg', role: 'Startup Founder' },
-    { featured: false, avatar: '👩‍💻', avatarBg: 'linear-gradient(135deg,rgba(245,158,11,0.3),rgba(217,119,6,0.2))', avatarBorder: 'rgba(245,158,11,0.3)', text: '"The automated preprocessing tools are worth it alone. Handling missing values used to take me hours; now it happens instantly upon dataset upload. Fantastic experience."', name: 'anushka', role: 'Growth Marketer' },
-    { featured: false, avatar: '👨‍🔬', avatarBg: 'linear-gradient(135deg,rgba(0,102,255,0.3),rgba(0,212,255,0.2))', avatarBorder: 'rgba(0,102,255,0.3)', text: '"The decision engine provides such precise recommendations. We uploaded our sales Excel sheet, and within seconds Datalytics pointed out anomalies we had totally missed."', name: 'saurav', role: 'Operations Head' },
+    { featured: true, avatar: '👨‍💼', avatarBg: 'linear-gradient(135deg,rgba(255,77,46,0.3),rgba(255,106,0,0.2))', avatarBorder: 'rgba(255,77,46,0.3)', text: '"Datalytics completely removed the headache of manual data cleaning. The way it handles CSV uploads and auto-detects schemas is flawless. Truly a beginner-friendly platform!"', name: 'Amit kr. Sharma', role: 'Data Analyst' },
+    { featured: false, avatar: '👨‍💻', avatarBg: 'linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,102,255,0.2))', avatarBorder: 'rgba(0,212,255,0.3)', text: '"I\'m not a coder, but I built a full interactive Power BI-style dashboard in just minutes. The no-code layout is incredibly intuitive and the live visuals are stunning."', name: 'Sachin kr. Verma', role: 'Business Owner' },
+    { featured: false, avatar: '👨‍🚀', avatarBg: 'linear-gradient(135deg,rgba(168,85,247,0.3),rgba(124,58,237,0.2))', avatarBorder: 'rgba(168,85,247,0.3)', text: '"The AI Chatbot feature is like having a data scientist on call 24/7. Asking questions in plain English and instantly getting charts back is a total game-changer."', name: 'Abhishek', role: 'Product Manager' },
+    { featured: false, avatar: '🧑‍🎨', avatarBg: 'linear-gradient(135deg,rgba(34,197,94,0.3),rgba(22,163,74,0.2))', avatarBorder: 'rgba(34,197,94,0.3)', text: '"I\'ve tried many ETL tools, but the pipeline speed from raw data to an Auto-ML model here is unmatched. It feels like an entire engineering team in one UI."', name: 'Virat ', role: 'Startup Founder' },
+    { featured: false, avatar: '👩‍💻', avatarBg: 'linear-gradient(135deg,rgba(245,158,11,0.3),rgba(217,119,6,0.2))', avatarBorder: 'rgba(245,158,11,0.3)', text: '"The automated preprocessing tools are worth it alone. Handling missing values used to take me hours; now it happens instantly upon dataset upload. Fantastic experience."', name: 'Anushka', role: 'Growth Marketer' },
+    { featured: false, avatar: '👨‍🔬', avatarBg: 'linear-gradient(135deg,rgba(0,102,255,0.3),rgba(0,212,255,0.2))', avatarBorder: 'rgba(0,102,255,0.3)', text: '"The decision engine provides such precise recommendations. We uploaded our sales Excel sheet, and within seconds Datalytics pointed out anomalies we had totally missed."', name: 'Saurav', role: 'Operations Head' },
   ];
 
   const faqs = [
@@ -1213,7 +1873,7 @@ export default function Datalytics() {
     { q: 'Can I export, share, or integrate reports (API available)?', a: 'Absolutely. You can easily export your generated charts and dashboard snapshots as professional PDFs. For expanding functionality, our Enterprise plan offers a secure REST API to integrate Datalytics natively into your existing workflows.' },
   ];
 
-  const marqueeItems = ['⚛️ React','🚀 Next.js','🐍 Python','⚡ FastAPI','🍃 MongoDB','🧠 OpenAI','📊 PowerBI','📄 CSV & Excel','🤖 Scikit-Learn'];
+  const marqueeItems = ['⚛️ React','🚀 Next.js','🐍 Python','⚡ FastAPI','🍃 MongoDB','🧠 OpenAI','📊 PowerBI','📄 CSV & Excel','🤖 Scikit-Learn','🤝 GroqAPI'];
 
   return (
     <div className="mm-wrap">
@@ -1221,10 +1881,11 @@ export default function Datalytics() {
 
       {isLaunching ? (
         <AuthSystem 
-          initialView="signup" 
+          initialView={authView} 
           onClose={() => setIsLaunching(false)} 
           onSuccess={() => {
-            setIsLaunching(false);
+            // Do NOT call setIsLaunching(false) here.
+            // Let the modal stay until the page transition to /app is complete.
             router.push('/app');
           }} 
         />
@@ -1274,18 +1935,18 @@ export default function Datalytics() {
             { icon: '⚡', label: 'Decisions' },
             { icon: '📋', label: 'Reports' },
           ].map((step, i) => (
-            <>
-              <div key={step.label} className="pl-node" style={{ animationDelay: `${i * 0.12}s` }}>
+            <Fragment key={step.label}>
+              <div className="pl-node" style={{ animationDelay: `${i * 0.12}s` }}>
                 <div className="pl-circle">{step.icon}</div>
                 <span className="pl-label">{step.label}</span>
               </div>
               {i < 9 && (
-                <div key={`arr-${i}`} className="pl-arrow" style={{ animationDelay: `${i * 0.12 + 0.06}s` }}>
+                <div className="pl-arrow" style={{ animationDelay: `${i * 0.12 + 0.06}s` }}>
                   <div className="pl-arrow-line" />
                   <div className="pl-arrow-head" />
                 </div>
               )}
-            </>
+            </Fragment>
           ))}
         </div>
       </div>
@@ -1319,6 +1980,20 @@ export default function Datalytics() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* LIVE PRODUCT PREVIEW */}
+      <section className="product-preview" id="preview">
+        <div className="section-head center" style={{ marginBottom: 40 }}>
+          <div className="section-tag green">Live Platform</div>
+          <h2 className="section-title">See it in action</h2>
+          <div className="section-divider center" style={{ background: 'linear-gradient(90deg,#22c55e,#16a34a)' }}/>
+          <p className="section-sub" style={{ marginTop: 16, margin: '16px auto 0' }}>
+            A real look inside the Datalytics pipeline — live data, real columns, zero setup.
+          </p>
+        </div>
+
+        <ProductPreview />
       </section>
 
       {/* THE OLD WAY IS BROKEN */}
@@ -1421,7 +2096,7 @@ export default function Datalytics() {
               { icon: '🤖', bg: 'linear-gradient(135deg,rgba(255,77,46,0.2),rgba(255,106,0,0.1))', border: 'rgba(255,77,46,0.25)', title: 'Automated AI Insights', val: '24/7', change: '▲ Zero Downtime', changeCls: 'up' },
               { icon: '🎨', bg: 'linear-gradient(135deg,rgba(0,212,255,0.2),rgba(0,102,255,0.1))', border: 'rgba(0,212,255,0.25)', title: 'Interface', val: 'Beginner Friendly', change: '★ 100% No-Code Layout', changeCls: 'up' },
               { icon: '⏱️', bg: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(124,58,237,0.1))', border: 'rgba(168,85,247,0.25)', title: 'Avg. Pipeline Execution', val: '1.5s', change: '★ From CSV to visual', changeCls: 'neutral' },
-              { icon: '📁', bg: 'linear-gradient(135deg,rgba(34,197,94,0.3),rgba(22,163,74,0.2))', border: 'rgba(34,197,94,0.3)', title: 'Supported Data Formats', val: 'CSV & Excel', change: '▲ Enterprise Scale', changeCls: 'up' },
+              { icon: '📁', bg: 'linear-gradient(135deg,rgba(34,197,94,0.3),rgba(22,163,74,0.2))', border: 'rgba(34,197,94,0.3)', title: 'Supported Data Formats', val: 'CSV,Json,Google Sheet & Databses', change: '▲ Enterprise Scale', changeCls: 'up' },
             ].map(m => (
               <div key={m.title} className="metric-big-card">
                 <div className="mbc-icon" style={{ background: m.bg, border: `1px solid ${m.border}` }}>{m.icon}</div>
@@ -1485,10 +2160,10 @@ export default function Datalytics() {
               <span style={{ fontSize: '0.65rem', background: '#1e293b', color: '#cbd5e1', padding: '4px 10px', borderRadius: 20, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Default</span>
             </div>
             <div className="price-amount" style={{ color: '#34d399' }}>₹0</div>
-            <div className="price-period" style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>100 Credits</div>
+            <div className="price-period" style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>200 Credits</div>
             <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 24, height: 40 }}>Perfect for small analytics projects, quick dataset exploration, and insight snapshots.</p>
             <div className="price-features">
-              {['100 Data Credits','Basic Analytics Report','Dataset Upload','Limited History Tracking'].map(f => (
+              {['200 Data Credits','Basic Analytics Report','Dataset Upload','Limited History Tracking'].map(f => (
                 <div key={f} className="pf-item" style={{ alignItems: 'flex-start', color: '#cbd5e1' }}>
                   <div className="pf-check yes" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399', border: 'none', width: '18px', height: '18px', marginTop: 2 }}>✓</div>{f}
                 </div>
@@ -1502,10 +2177,10 @@ export default function Datalytics() {
               <div className="price-plan" style={{ color: '#fff', fontSize: '1.2rem', marginBottom: 0 }}>Starter Pack</div>
             </div>
             <div className="price-amount" style={{ color: '#34d399' }}>₹100</div>
-            <div className="price-period" style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>150 Credits</div>
+            <div className="price-period" style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>200 Credits</div>
             <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 24, height: 40 }}>Great for focused insight generation, dashboard building, and KPI tracking.</p>
             <div className="price-features" style={{ flex: 1 }}>
-              {['150 Data Credits','Detailed Analytics Reports','Performance Analytics','Full Dataset History'].map(f => (
+              {['200 Data Credits','Detailed Analytics Reports','Performance Analytics','Full Dataset History'].map(f => (
                 <div key={f} className="pf-item" style={{ alignItems: 'flex-start', color: '#cbd5e1' }}>
                   <div className="pf-check yes" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399', border: 'none', width: '18px', height: '18px', marginTop: 2 }}>✓</div>{f}
                 </div>
@@ -1520,10 +2195,10 @@ export default function Datalytics() {
               <span style={{ fontSize: '0.65rem', background: 'rgba(16,185,129,0.2)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)', padding: '4px 10px', borderRadius: 20, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Best Value</span>
             </div>
             <div className="price-amount" style={{ color: '#34d399' }}>₹500</div>
-            <div className="price-period" style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>650 Credits</div>
+            <div className="price-period" style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: 20 }}>800 Credits</div>
             <p style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.6, marginBottom: 24, height: 40 }}>Best value for advanced analytics, predictive modeling, and executive reporting.</p>
             <div className="price-features" style={{ flex: 1 }}>
-              {['650 Data Credits','Advanced AI Insights','Predictive Trend Analysis','Priority Query Processing'].map(f => (
+              {['800 Data Credits','Advanced AI Insights','Predictive Trend Analysis','Priority Query Processing'].map(f => (
                 <div key={f} className="pf-item" style={{ alignItems: 'flex-start', color: '#cbd5e1' }}>
                   <div className="pf-check yes" style={{ background: 'rgba(16,185,129,0.2)', color: '#34d399', border: 'none', width: '18px', height: '18px', marginTop: 2 }}>✓</div>{f}
                 </div>
@@ -1631,12 +2306,63 @@ export default function Datalytics() {
       </section>
 
       {/* FOOTER */}
-      <footer className="mm-footer" id="footer">
-        <div className="footer-top">
+      <footer className="mm-footer" id="footer" style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* Ghost watermark */}
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: 'clamp(80px, 14vw, 160px)',
+          fontWeight: '900',
+          letterSpacing: '-0.04em',
+          color: 'transparent',
+          WebkitTextStroke: '1.5px rgba(255,255,255,0.06)',
+          userSelect: 'none',
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          zIndex: 0,
+          fontFamily: "'Inter', 'Outfit', sans-serif",
+          lineHeight: 1,
+        }}>
+          DATALYTICS
+        </div>
+        <div className="footer-top" style={{ position: 'relative', zIndex: 1 }}>
           <div className="footer-brand">
             <div className="footer-logo">
-              <div className="logo-icon" style={{ display: 'flex', gap: 3, alignItems: 'flex-end' }}>
-                {[14,22,18].map(h => <span key={h} style={{ display: 'block', width: 5, height: h, borderRadius: 2, background: 'linear-gradient(180deg,#ff6a00,#ff4d2e)' }} />)}
+              <div style={{
+                position: 'relative',
+                width: '34px',
+                height: '26px',
+                perspective: '110px',
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'center',
+                gap: '4px',
+                flexShrink: 0,
+              }}>
+                <div style={{
+                  position: 'absolute', bottom: '-3px', left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '30px', height: '8px',
+                  background: 'radial-gradient(ellipse, rgba(255,110,0,0.55) 0%, transparent 70%)',
+                  filter: 'blur(4px)', borderRadius: '50%',
+                  animation: 'logo3dPulse 2.5s ease-in-out infinite',
+                }} />
+                {[{ h: '55%' }, { h: '100%' }, { h: '72%' }].map((bar, i) => (
+                  <div key={i} style={{
+                    position: 'relative', width: '7px', height: bar.h,
+                    borderRadius: '3px',
+                    background: 'linear-gradient(180deg, #ffb347 0%, #ff6d00 45%, #cc2800 100%)',
+                    boxShadow: '0 2px 8px rgba(255,100,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35)',
+                    transform: 'rotateX(16deg) rotateY(-5deg)',
+                    transformStyle: 'preserve-3d',
+                    animation: `logo3dBob ${1.5 + i * 0.2}s ease-in-out ${i * 0.15}s infinite`,
+                  }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(180deg, rgba(255,255,255,0.4) 0%, transparent 100%)', borderRadius: '3px 3px 0 0' }} />
+                    <div style={{ position: 'absolute', top: 0, right: 0, width: '30%', height: '100%', background: 'linear-gradient(270deg, rgba(0,0,0,0.3) 0%, transparent 100%)', borderRadius: '0 3px 3px 0' }} />
+                  </div>
+                ))}
               </div>
               Datalytics
             </div>
@@ -1692,7 +2418,7 @@ export default function Datalytics() {
             </div>
           ))}
         </div>
-        <div className="footer-bottom">
+        <div className="footer-bottom" style={{ position: 'relative', zIndex: 1 }}>
           <div className="footer-copy">© 2026 Datalytics. Developed by SANGAM SINGH</div>
           <div className="footer-badge"><span className="badge-dot"/>All systems operational</div>
         </div>

@@ -30,6 +30,7 @@ async def _run_preprocess(
             task_type=body.task_type,
             missing_strategy=body.missing_strategy,
             encode_method=body.encode_method,
+            manual_encoding_rules=body.manual_encoding_rules,
             scaling_method=body.scaling_method,
             test_size=body.test_size,
             random_state=body.random_state,

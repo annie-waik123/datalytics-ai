@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 
+import pandas as pd
 from fastapi import APIRouter, Body, File, Form, Header, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
@@ -60,8 +61,14 @@ async def _persist_snapshot_to_db(session_id: str, filename: str, snapshot: dict
                 "storage_mode": snapshot.get("storage_mode", "memory"),
             },
         )
-    except Exception:
+    except Exception as exc:
+        import traceback
+        print(f"[PERSIST ERROR] {traceback.format_exc()}")
+        # Log error but don't fail the entire upload if database persistence fails
         pass
+    finally:
+        import gc
+        gc.collect()
 
 
 async def _handle_uploaded_file(
@@ -87,9 +94,16 @@ async def _handle_uploaded_file(
             file_size=file_size,
         )
     except Exception as exc:
+        import traceback
+        print(f"[UPLOAD ERROR] {traceback.format_exc()}")
         raise HTTPException(status_code=422, detail=f"Could not parse file: {exc}")
 
     await _persist_snapshot_to_db(session_id, filename, snapshot)
+    
+    # Final cleanup before sending response
+    import gc
+    gc.collect()
+    
     return JSONResponse(snapshot)
 
 
@@ -186,3 +200,156 @@ async def upload_complete(
 
     await _persist_snapshot_to_db(x_session_id, session.dataset_name or source_path.name, snapshot)
     return JSONResponse(snapshot)
+
+
+@router.post("/upload/connect")
+async def upload_connect(
+    payload: dict = Body(...),
+    x_session_id: str = Header(..., alias="X-Session-ID"),
+):
+    source = payload.get("source")
+    host = payload.get("host")
+    port = payload.get("port")
+    database = payload.get("database")
+    table = payload.get("table")
+    username = payload.get("username")
+    password = payload.get("password")
+    url = payload.get("url")
+
+    import pandas as pd
+    import math
+
+    try:
+        if source in ["mysql", "postgresql", "mssql"]:
+            import sqlalchemy as sa
+            if source == "mysql":
+                if not port: port = 3306
+                conn_str = f"mysql+pymysql://{username}:{password}@{host}:{port}/{database}"
+            elif source == "postgresql":
+                if not port: port = 5432
+                conn_str = f"postgresql+psycopg2://{username}:{password}@{host}:{port}/{database}"
+            elif source == "mssql":
+                if not port: port = 1433
+                conn_str = f"mssql+pymssql://{username}:{password}@{host}:{port}/{database}"
+            
+            engine = sa.create_engine(conn_str)
+            if table:
+                query = f"SELECT * FROM {table} LIMIT 10000"
+            else:
+                insp = sa.inspect(engine)
+                tables = insp.get_table_names()
+                if not tables:
+                    raise Exception("No tables found in database.")
+                query = f"SELECT * FROM {tables[0]} LIMIT 10000"
+            df = pd.read_sql(query, engine)
+        
+        elif source == "mongodb":
+            from pymongo import MongoClient
+            if not port: port = 27017
+            client = MongoClient(host=host, port=int(port), username=username, password=password)
+            db = client[database]
+            if table:
+                collection = db[table]
+            else:
+                collections = db.list_collection_names()
+                if not collections:
+                    raise Exception("No collections found.")
+                collection = db[collections[0]]
+            cursor = collection.find().limit(10000)
+            df = pd.DataFrame(list(cursor))
+            if "_id" in df.columns:
+                df["_id"] = df["_id"].astype(str)
+
+        elif source == "json":
+            import requests
+            res = requests.get(url)
+            res.raise_for_status()
+            data = res.json()
+            if isinstance(data, dict) and len(data.keys()) == 1:
+                data = list(data.values())[0]
+            df = pd.DataFrame(data)
+
+        elif source == "googlesheets":
+            import re
+            import requests
+            import io
+            
+            match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
+            if match:
+                sheet_id = match.group(1)
+                # Using export?format=csv is the standard way to download a google sheet
+                csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+            elif "/edit" in url:
+                csv_url = url.replace("/edit", "/export?format=csv").split("#")[0]
+            else:
+                csv_url = url
+
+            try:
+                # Add User-Agent to prevent 403/401 errors from Google blocking bot traffic
+                res = requests.get(csv_url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'})
+                res.raise_for_status()
+                # If Google returns HTML instead of CSV, it's likely a redirect to a login page
+                if "text/html" in res.headers.get("Content-Type", ""):
+                    raise Exception("Failed to fetch Google Sheet. The link requires authentication. Please ensure the sheet is truly public (Anyone with link -> Viewer).")
+                df = pd.read_csv(io.StringIO(res.text))
+            except requests.exceptions.HTTPError as e:
+                if res.status_code in [401, 403, 404]:
+                    raise Exception("Failed to fetch Google Sheet. Please ensure the sheet is truly public (Anyone with link -> Viewer).")
+                raise Exception(f"HTTP Error while fetching Google Sheet: {res.status_code}")
+            except Exception as e:
+                if "Failed to fetch Google Sheet" in str(e):
+                    raise e
+                raise Exception(f"Failed to parse Google Sheet as CSV. Error: {str(e)}")
+        if df.empty:
+            raise Exception("The imported dataset is empty.")
+
+        df = df.replace([float('inf'), float('-inf')], None)
+        df = df.where(pd.notnull(df), None)
+
+        for col in df.columns:
+            if df[col].dtype == "object":
+                df[col] = df[col].astype(str)
+
+        rows = df.to_dict(orient="records")
+        columns = list(df.columns)
+        
+        filename = f"{source.capitalize()} - {database or str(url)[:15]}"
+        
+        session = store.get(x_session_id)
+        _reset_session_state(session)
+        
+        snapshot = {
+            "name": filename,
+            "rows": len(rows),
+            "cols": len(columns),
+            "all_columns": columns,
+            "columns_info": [],
+            "sample_rows": rows[:2000],
+            "backend_managed": True,
+            "storage_mode": "memory"
+        }
+        
+        session.dataset_name = filename
+        session.dataset_path = None
+        session.dataset_format = source or "connected"
+        session.dataset_storage_mode = "memory"
+        session.dataset_file_size = 0
+        session.dataset_row_count = int(len(df))
+        session.dataset_column_count = int(len(columns))
+        session.dataset_columns = columns
+        session.dataset_snapshot = snapshot
+        session.df = df.copy()
+        session.df_original = df.copy()
+        session.df_processed = df
+        session.feature_columns = columns
+        
+        await _persist_snapshot_to_db(x_session_id, filename, snapshot)
+        import gc
+        gc.collect()
+        
+        return JSONResponse(snapshot)
+    
+    except Exception as e:
+        import traceback
+        print(f"[DB CONNECT ERROR] {traceback.format_exc()}")
+        raise HTTPException(status_code=400, detail=str(e))

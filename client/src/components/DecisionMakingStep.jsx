@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useToast } from '../hooks/useToast.js'
 import { generateRecommendationInsights, syncInsightsDataset } from '../api/insights.js'
+import { saveIndustryPdf } from '../utils/industryPdf.js'
+import CoinAnimation from '../components/ui/CoinAnimation';
 
 const STORAGE_KEY = 'datalytics_decision_making_json'
 
@@ -60,25 +62,72 @@ STRICT RULES:
 `
 
 function normalizePayload(response) {
-  let content = response?.generated_response?.content || response?.content || ''
+  let content = response?.generated_response?.content || response?.content || response?.answer || response?.generated_response?.answer || ''
   
   try {
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0])
+      let jsonStr = jsonMatch[0]
+      
+      // Attempt to fix truncated JSON by adding closing brackets
+      let openBraces = (jsonStr.match(/\{/g) || []).length
+      let closeBraces = (jsonStr.match(/\}/g) || []).length
+      let openBrackets = (jsonStr.match(/\[/g) || []).length
+      let closeBrackets = (jsonStr.match(/\]/g) || []).length
+      
+      if (openBraces > closeBraces) jsonStr += '}'.repeat(openBraces - closeBraces)
+      if (openBrackets > closeBrackets) jsonStr += ']'.repeat(openBrackets - closeBrackets)
+
+      try {
+        return JSON.parse(jsonStr)
+      } catch (e) {
+        // Partial recovery for decisions if JSON is too broken
+        const topDecMatch = content.match(/"decision"\s*:\s*"(.*?)"/g)
+        if (topDecMatch) {
+          return {
+            top_decisions: topDecMatch.map(m => ({
+              decision: m.match(/"decision"\s*:\s*"(.*?)"/)[1],
+              reason: "Partially recovered from truncated response",
+              expected_outcome: "Analysis incomplete",
+              priority: "High"
+            })),
+            inventory_decisions: [],
+            growth_opportunities: [],
+            losses_problems: [],
+            future_strategy: [],
+            smart_actions: []
+          }
+        }
+      }
     }
   } catch (e) {
     console.warn("Decision engine JSON parsing failed", e)
   }
   
-  return null
+  // Final fallback structure instead of null
+  return {
+    top_decisions: [
+      {
+        decision: "Manual Review Required",
+        reason: "The AI provided a text-based response that couldn't be automatically parsed into structured decisions.",
+        expected_outcome: "Review the raw AI output below for insights.",
+        priority: "Medium"
+      }
+    ],
+    inventory_decisions: [],
+    growth_opportunities: [],
+    losses_problems: [],
+    future_strategy: [],
+    smart_actions: [{ automation: content.substring(0, 200) + "..." }]
+  }
 }
 
-export default function DecisionMakingStep({ dataset, datasetProfile, onComplete, onJumpToUpload }) {
+export default function DecisionMakingStep({ dataset, datasetProfile, onComplete, onBeforeEvaluate, onJumpToUpload }) {
   const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [userBalance, setUserBalance] = useState(200);
 
   useEffect(() => {
     try {
@@ -100,19 +149,28 @@ export default function DecisionMakingStep({ dataset, datasetProfile, onComplete
   }
 
   const handleEvaluate = async () => {
+    if (loading) return
+    const charged = await onBeforeEvaluate?.()
+    if (charged === false) return
+
     setLoading(true)
     setError(null)
     try {
       await syncInsightsDataset(dataset)
-      const res = await generateRecommendationInsights(DECISION_PROMPT, 'recommendation_insights')
+      const res = await generateRecommendationInsights(DECISION_PROMPT, 'decision_making')
       const parsed = normalizePayload(res)
       
-      if (!parsed) {
-         throw new Error("API returned invalid format")
+      const finalData = parsed || {
+        top_decisions: [{ decision: "Manual Review Required", reason: "The AI response was empty.", expected_outcome: "Try again or check logs.", priority: "Low" }],
+        inventory_decisions: [],
+        growth_opportunities: [],
+        losses_problems: [],
+        future_strategy: [],
+        smart_actions: []
       }
 
-      setData(parsed)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+      setData(finalData)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalData))
       addToast('Executive decisions successfully generated.', null, 'success')
       onComplete('decisionMaking')
 
@@ -141,6 +199,36 @@ export default function DecisionMakingStep({ dataset, datasetProfile, onComplete
     }
   }
 
+  function handleDownloadPdf() {
+    if (!data) {
+        addToast('Evaluate scenarios first.', null, 'warning');
+        return;
+    }
+
+    saveIndustryPdf({
+        title: 'Decision Making Report',
+        subtitle: 'Board-ready scenario decisions, growth opportunities, risk fixes, and automation actions.',
+        datasetName: dataset?.name,
+        filePrefix: 'Datalytics_Decision_Making',
+        metrics: [
+            { label: 'Rows', value: (datasetProfile?.totalRowCount || datasetProfile?.rowCount || 0).toLocaleString() },
+            { label: 'Columns', value: String(datasetProfile?.totalColumnCount || datasetProfile?.columnCount || 0) },
+            { label: 'Top Decisions', value: String(data.top_decisions?.length || 0) },
+            { label: 'Resource Actions', value: String(data.inventory_decisions?.length || 0) },
+            { label: 'Opportunities', value: String(data.growth_opportunities?.length || 0) },
+            { label: 'Problem Fixes', value: String(data.losses_problems?.length || 0) },
+        ],
+        sections: [
+            { title: 'Top Decisions', items: data.top_decisions?.map((item) => `${item.priority || 'High'} priority: ${item.decision}. Reason: ${item.reason}. Expected outcome: ${item.expected_outcome || item.impact || 'Not specified.'}`) },
+            { title: 'Inventory & Resource Actions', items: data.inventory_decisions?.map((item) => `${item.category || 'Action'} for ${item.entities || 'target entities'}: ${item.action}`) },
+            { title: 'Losses & Problems', items: data.losses_problems?.map((item) => `${item.problem}. Fix: ${item.fix}`) },
+            { title: 'Growth Opportunities', items: data.growth_opportunities?.map((item) => item.opportunity) },
+            { title: 'Future Strategy', items: data.future_strategy?.map((item) => `${item.strategy}. Preparation: ${item.preparation}`) },
+        ],
+    });
+    onComplete('decisionMaking');
+  }
+
   return (
     <div className="rec-container">
       <div className="rec-header">
@@ -152,15 +240,20 @@ export default function DecisionMakingStep({ dataset, datasetProfile, onComplete
           <button className="btn btn-primary" type="button" onClick={handleEvaluate} disabled={loading}>
             {loading ? 'Evaluating...' : data ? 'Re-evaluate Scenarios' : 'Evaluate Scenarios'}
           </button>
+          {data && (
+            <button className="btn btn-primary btn-pdf" type="button" onClick={handleDownloadPdf}>
+              Download PDF
+            </button>
+          )}
         </div>
       </div>
 
+      <CoinAnimation />
+
       {loading && (
-        <div className="typing-indicator" style={{ marginTop: '20px', marginBottom: '20px' }}>
-          <span />
-          <span />
-          <span />
-          <span className="typing-label">The AI Decision Engine is assessing patterns and formatting outcomes...</span>
+        <div className="flex justify-center items-center py-8 gap-3 text-slate-400" style={{ marginTop: '20px', marginBottom: '20px' }}>
+          <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm font-medium">Evaluating scenarios...</span>
         </div>
       )}
 

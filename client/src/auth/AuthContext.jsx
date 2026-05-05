@@ -291,6 +291,12 @@ export function AuthProvider({ children }) {
     setLoadingAction('logout')
 
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null
+      try {
+        if (token) {
+          await fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+        }
+      } catch {}
       await signOut(auth)
       clearProfileCache()
       setProfile(null)

@@ -1,25 +1,8 @@
-import { Inter, JetBrains_Mono, Poppins } from 'next/font/google'
 import './globals.css'
 import Providers from './providers.jsx'
 
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['500', '600', '700', '800', '900'],
-  variable: '--font-display',
-})
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-body',
-})
-
-const mono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
-})
-
 export const metadata = {
-  metadataBase: new URL('http://localhost:3000'),
+  metadataBase: new URL('http://localhost:5000'),
   title: {
     default: 'Datalytics | AI-Powered ML & Insights Platform',
     template: '%s | Datalytics',
@@ -39,7 +22,7 @@ export const metadata = {
     title: 'Datalytics | AI-Powered ML & Insights Platform',
     description:
       'The all-in-one platform to upload datasets, train models, and talk to your data.',
-    url: 'http://localhost:3000',
+    url: 'http://localhost:5000',
     siteName: 'Datalytics',
     locale: 'en_US',
     type: 'website',
@@ -56,9 +39,14 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${inter.variable} ${mono.variable} scroll-smooth`}
+      className="scroll-smooth"
       suppressHydrationWarning
-      style={{ background: '#060b14' }}
+      style={{
+        background: '#060b14',
+        '--font-display': 'Poppins, Inter, Arial, sans-serif',
+        '--font-body': 'Inter, Arial, sans-serif',
+        '--font-mono': 'JetBrains Mono, Consolas, monospace',
+      }}
     >
       <body
         className="min-h-screen font-[family:var(--font-body)] text-white antialiased"

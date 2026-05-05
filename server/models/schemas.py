@@ -8,11 +8,16 @@ from pydantic import BaseModel, Field
 
 # ── Requests ─────────────────────────────────────────────────────────────────
 
+class ManualEncodingRule(BaseModel):
+    method: str  # "Label Encoding" | "One-Hot Encoding"
+    columns: List[str]
+
 class PreprocessRequest(BaseModel):
     target_col: str
     task_type: str                        # "Classification" | "Regression"
     missing_strategy: Optional[str] = None  # None means no missing values
-    encode_method: Optional[str] = None   # "Label Encoding" | "One-Hot Encoding"
+    encode_method: Optional[str] = None   # "Label Encoding" | "One-Hot Encoding" | "Auto" | "Manual"
+    manual_encoding_rules: Optional[List[ManualEncodingRule]] = []
     scaling_method: str = "None"          # "None" | "StandardScaler" | "MinMaxScaler"
     test_size: float = 0.2
     random_state: int = 42

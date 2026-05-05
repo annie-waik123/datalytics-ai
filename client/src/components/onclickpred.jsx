@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import client from '../api/client.js'
 import { buildDatasetSyncPayload, isBackendDatasetReady } from '../api/datasetSession.js'
 import { useToast } from '../hooks/useToast.js'
+import CustomDropdown from './ui/CustomDropdown.jsx';
 
 const IDENTIFIER_HINTS = ['id', 'uuid', 'guid', 'index', 'serial', 'code', 'employeeid', 'empid']
 const TARGET_HINTS = ['target', 'label', 'class', 'status', 'attrition', 'churn', 'outcome', 'result', 'response', 'category', 'segment', 'rating', 'score', 'sales', 'revenue', 'price', 'amount']
@@ -60,18 +61,18 @@ function targetScore(dataset, column) {
   return score
 }
 
-function recommendTargetColumn(dataset) {
+function defaultTargetColumn(dataset) {
   const columns = dataset?.columns || []
   if (!columns.length) return ''
-  const ranked = [...columns].sort((left, right) => targetScore(dataset, right) - targetScore(dataset, left))
-  const best = ranked[0]
-  if (best && targetScore(dataset, best) > -50) return best
-  const nonIdentifier = columns.find((column) => !isIdentifierLike(column, columnValues(dataset, column)))
-  return nonIdentifier || columns[0]
+  // ML convention: target is almost always the last column
+  // Fall back to last non-identifier if last column looks like an ID
+  const last = columns[columns.length - 1]
+  if (last && !isIdentifierLike(last, columnValues(dataset, last))) return last
+  return columns.find((col) => !isIdentifierLike(col, columnValues(dataset, col))) || columns[0]
 }
 
 function buildAutomaticPayload(dataset, overrides = {}) {
-  const target_col = overrides.target_col || recommendTargetColumn(dataset)
+  const target_col = overrides.target_col || defaultTargetColumn(dataset)
   return {
     target_col,
     task_type: overrides.task_type || inferTaskType(dataset, target_col),
@@ -108,11 +109,13 @@ export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
   const columns = dataset?.columns || []
 
   const [targetCol, setTargetCol] = useState('')
-  const [targetAuto, setTargetAuto] = useState(true)
   const [taskType, setTaskType] = useState('Classification')
-  const [taskAuto, setTaskAuto] = useState(true)
-  const [missingStrategy, setMissingStrategy] = useState('Fill with mode (all)')
-  const [encoding, setEncoding] = useState('Label Encoding')
+  const [missingStrategy, setMissingStrategy] = useState(dataset?.meta?.missingTotal === 0 ? 'None' : 'Fill with mode (all)')
+  const [encoding, setEncoding] = useState('Auto')
+  const [encodingRules, setEncodingRules] = useState([
+    { method: 'One-Hot Encoding', columns: [] },
+    { method: 'Label Encoding', columns: [] }
+  ])
   const [scaling, setScaling] = useState('StandardScaler')
   const [testSize, setTestSize] = useState(20)
   const [randomState, setRandomState] = useState(42)
@@ -121,29 +124,13 @@ export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
   const [warnings, setWarnings] = useState([])
   const [success, setSuccess] = useState(false)
 
+  // Set target to last column whenever the dataset changes (ML convention)
   useEffect(() => {
-    setTargetAuto(true)
+    if (!columns.length) { setTargetCol(''); return }
+    const def = defaultTargetColumn(dataset)
+    setTargetCol(def)
+    setTaskType(inferTaskType(dataset, def))
   }, [dataset?.name, columns.join('|')])
-
-  useEffect(() => {
-    if (!columns.length) {
-      setTargetCol('')
-      return
-    }
-    if (!targetAuto && columns.includes(targetCol)) return
-    const recommended = recommendTargetColumn(dataset)
-    setTargetCol(recommended || columns[0])
-  }, [columns, dataset, targetAuto, targetCol])
-
-  useEffect(() => {
-    if (!targetCol) return
-    setTaskAuto(true)
-  }, [targetCol])
-
-  useEffect(() => {
-    if (!taskAuto || !targetCol) return
-    setTaskType(inferTaskType(dataset, targetCol))
-  }, [dataset, targetCol, taskAuto])
 
   async function submitPreprocess(payload) {
     await syncDatasetForPrediction(dataset)
@@ -155,8 +142,6 @@ export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
     const resolvedTask = responseData?.task_type || payload.task_type
     setTargetCol(resolvedTarget)
     setTaskType(resolvedTask)
-    setTargetAuto(false)
-    setTaskAuto(false)
     setWarnings(responseData?.encoding_warnings || [])
   }
 
@@ -170,7 +155,8 @@ export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
       target_col: targetCol,
       task_type: taskType,
       missing_strategy: missingStrategy,
-      encode_method: encoding,
+      encode_method: encoding === 'Manual' ? 'Manual' : encoding,
+      manual_encoding_rules: encoding === 'Manual' ? encodingRules.filter(r => r.columns.length > 0) : [],
       scaling_method: scaling,
       test_size: Number(testSize) / 100,
       random_state: Number(randomState),
@@ -183,7 +169,7 @@ export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
         response = await submitPreprocess(initialPayload)
       } catch (firstError) {
         const fallbackPayload = buildAutomaticPayload(dataset, {
-          missing_strategy: 'Fill with mode (all)',
+          missing_strategy: missingStrategy === 'None' ? 'None' : 'Fill with mode (all)',
           encode_method: 'Label Encoding',
           scaling_method: scaling === 'None' ? 'None' : 'StandardScaler',
           test_size: 0.2,
@@ -228,135 +214,215 @@ export default function OnClickPred({ dataset, onPreprocessed, setStatus }) {
     }
   }
 
+  const duplicateColumns = [];
+  if (encoding === 'Manual') {
+    const colCounts = {};
+    encodingRules.forEach(rule => {
+      rule.columns.forEach(c => {
+        colCounts[c] = (colCounts[c] || 0) + 1;
+      });
+    });
+    for (const c in colCounts) {
+      if (colCounts[c] > 1) duplicateColumns.push(c);
+    }
+  }
+
+  const G = '#22c55e', Gd = 'rgba(34,197,94,.12)', Gb = 'rgba(34,197,94,.3)'
+  const card = {
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 18, padding: '1.5rem 1.75rem', marginBottom: '1.25rem', backdropFilter: 'blur(8px)',
+  }
+  const sectionLabel = {
+    display: 'flex', alignItems: 'center', gap: '.45rem',
+    fontFamily: 'Space Grotesk,sans-serif', fontWeight: 700, fontSize: '.75rem',
+    letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)', marginBottom: '1rem',
+  }
+  const chipStyle = (active) => ({
+    padding: '.55rem 1.15rem', borderRadius: 100, cursor: 'pointer',
+    fontFamily: 'Space Grotesk,sans-serif', fontWeight: 700, fontSize: '.82rem',
+    border: `1.5px solid ${active ? Gb : 'rgba(255,255,255,0.1)'}`,
+    background: active ? Gd : 'rgba(255,255,255,0.04)',
+    color: active ? G : 'rgba(255,255,255,0.5)',
+    transition: 'all .18s ease', outline: 'none',
+  })
+  const selectStyle = {
+    width: '100%', padding: '.75rem 1rem', borderRadius: 10,
+    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)',
+    color: '#fff', fontSize: '.9rem', fontFamily: 'Space Grotesk,sans-serif',
+    fontWeight: 600, outline: 'none', cursor: 'pointer',
+  }
+
   return (
-    <div>
-      <div className="step-header">
-        <div>
-          <h1 className="page-title">Data Preprocessing</h1>
-          <p className="page-subtitle">Configure cleaning, encoding, and scaling before training models.</p>
+    <div style={{ fontFamily: 'Inter,sans-serif' }}>
+
+      {/* HEADER */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.4rem' }}>
+          <span style={{ fontSize: '1.4rem' }}>⚙️</span>
+          <h1 style={{ margin: 0, fontFamily: 'Space Grotesk,sans-serif', fontWeight: 800, fontSize: '1.65rem', color: '#fff' }}>Data Preprocessing</h1>
         </div>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: '.85rem', paddingLeft: '2.1rem' }}>Configure cleaning, encoding, and scaling before training models.</p>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-title">Target Column & Task</div>
-        <div className="form-row form-row-2">
-          <div className="form-group">
-            <label>Target Column</label>
-            <select
-              value={targetCol}
-              onChange={(e) => {
-                setTargetAuto(false)
-                setTargetCol(e.target.value)
-              }}
-            >
-              {columns.map((col) => <option key={col} value={col}>{col}</option>)}
-            </select>
+      {/* TARGET COLUMN & TASK */}
+      <div style={card}>
+        <div style={sectionLabel}><span>🎯</span> Target Column &amp; Task</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div>
+            <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Target Column</div>
+            <CustomDropdown value={targetCol} onChange={(val) => setTargetCol(val)} style={selectStyle}>
+              {columns.map((col) => <option key={col} value={col} style={{ background: '#1a1a2e' }}>{col}</option>)}
+            </CustomDropdown>
           </div>
-          <div className="form-group">
-            <label>Task Type</label>
-            <div className="chip-group">
-              {['Classification', 'Regression'].map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  className={`chip ${taskType === type ? 'is-active' : ''}`}
-                  onClick={() => {
-                    setTaskAuto(false)
-                    setTaskType(type)
-                  }}
-                >
-                  {type}
-                </button>
+          <div>
+            <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Task Type</div>
+            <div style={{ display: 'flex', gap: '.6rem' }}>
+              {[{ v: 'Classification', i: '🏷️' }, { v: 'Regression', i: '📈' }].map(({ v, i }) => (
+                <button key={v} type="button" onClick={() => setTaskType(v)} style={{ ...chipStyle(taskType === v), flex: 1 }}>{i} {v}</button>
               ))}
             </div>
           </div>
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-title">Missing Values</div>
-        <div className="form-group">
-          <label>Strategy</label>
-          <select value={missingStrategy} onChange={(e) => setMissingStrategy(e.target.value)}>
-            <option value="Drop rows with missing values">Drop rows with missing values</option>
-            <option value="Fill with mean (numeric)">Fill with mean (numeric)</option>
-            <option value="Fill with median (numeric)">Fill with median (numeric)</option>
-            <option value="Fill with mode (all)">Fill with mode (all)</option>
-          </select>
-        </div>
+      {/* MISSING VALUES */}
+      <div style={card}>
+        <div style={sectionLabel}><span>🩹</span> Missing Values</div>
+        <CustomDropdown value={missingStrategy} onChange={(val) => setMissingStrategy(val)} style={selectStyle}>
+          <option value="None" style={{ background: '#1a1a2e', color: '#10b981' }}>None (Already Cleaned in Data Preparation)</option>
+          <option value="Drop rows with missing values" style={{ background: '#1a1a2e' }}>Drop rows with missing values</option>
+          <option value="Fill with mean (numeric)" style={{ background: '#1a1a2e' }}>Fill with mean (numeric)</option>
+          <option value="Fill with median (numeric)" style={{ background: '#1a1a2e' }}>Fill with median (numeric)</option>
+          <option value="Fill with mode (all)" style={{ background: '#1a1a2e' }}>Fill with mode (all)</option>
+        </CustomDropdown>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-title">Encoding</div>
-        <div className="chip-group">
-          {['Label Encoding', 'One-Hot Encoding'].map((type) => (
-            <button
-              key={type}
-              type="button"
-              className={`chip ${encoding === type ? 'is-active' : ''}`}
-              onClick={() => setEncoding(type)}
-            >
-              {type}
-            </button>
+      {/* ENCODING */}
+      <div style={card}>
+        <div style={sectionLabel}><span>🔠</span> Encoding Strategy</div>
+        <div style={{ display: 'flex', gap: '.65rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+          {[{ v: 'Auto', i: '⚡' }, { v: 'Manual', i: '🛠️' }, { v: 'No Encoding', i: '🚫' }].map(({ v, i }) => (
+            <button key={v} type="button" onClick={() => setEncoding(v)} style={chipStyle(encoding === v)}>{i} {v}</button>
+          ))}
+        </div>
+
+        {encoding === 'Manual' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {encodingRules.map((rule, idx) => (
+              <div key={idx} style={{ 
+                padding: '1.25rem', borderRadius: 14, background: 'rgba(255,255,255,0.02)', 
+                border: '1px solid rgba(255,255,255,0.06)', position: 'relative' 
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem' }}>
+                  <div>
+                    <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Method</div>
+                    <div style={{ 
+                      ...selectStyle, 
+                      cursor: 'default', 
+                      background: 'rgba(0,0,0,0.2)', 
+                      color: 'rgba(255,255,255,0.8)' 
+                    }}>
+                      {rule.method}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.35)', fontWeight: 600, marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.05em' }}>Columns</div>
+                    <div style={{ 
+                      display: 'flex', flexWrap: 'wrap', gap: '.5rem', padding: '.5rem', 
+                      minHeight: '42px', background: 'rgba(0,0,0,0.2)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.05)' 
+                    }}>
+                      {columns.map(col => {
+                        const isSelected = rule.columns.includes(col)
+                        return (
+                          <button
+                            key={col}
+                            type="button"
+                            onClick={() => {
+                              const newRules = [...encodingRules]
+                              if (isSelected) {
+                                newRules[idx].columns = newRules[idx].columns.filter(c => c !== col)
+                              } else {
+                                // Prevent selecting same column in different manual rules for simplicity in UI
+                                // but allow if user wants to override (backend will handle)
+                                newRules[idx].columns = [...newRules[idx].columns, col]
+                              }
+                              setEncodingRules(newRules)
+                            }}
+                            style={{
+                              padding: '.3rem .7rem', borderRadius: 8, fontSize: '.75rem', fontWeight: 600,
+                              background: isSelected ? Gd : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${isSelected ? Gb : 'rgba(255,255,255,0.1)'}`,
+                              color: isSelected ? G : 'rgba(255,255,255,0.4)',
+                              transition: 'all .15s ease'
+                            }}
+                          >
+                            {col}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* FEATURE SCALING */}
+      <div style={card}>
+        <div style={sectionLabel}><span>⚖️</span> Feature Scaling</div>
+        <div style={{ display: 'flex', gap: '.65rem', flexWrap: 'wrap' }}>
+          {[{ v: 'None', i: '∅' }, { v: 'StandardScaler', i: '📊' }, { v: 'MinMaxScaler', i: '📐' }].map(({ v, i }) => (
+            <button key={v} type="button" onClick={() => setScaling(v)} style={chipStyle(scaling === v)}>{i} {v}</button>
           ))}
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-title">Feature Scaling</div>
-        <div className="chip-group">
-          {['None', 'StandardScaler', 'MinMaxScaler'].map((type) => (
-            <button
-              key={type}
-              type="button"
-              className={`chip ${scaling === type ? 'is-active' : ''}`}
-              onClick={() => setScaling(type)}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-title">Train-Test Split</div>
-        <div className="form-row form-row-2">
-          <div className="form-group">
-            <label>Test Size: {testSize}%</label>
-            <input
-              type="range"
-              min="10"
-              max="50"
-              value={testSize}
-              onChange={(e) => setTestSize(e.target.value)}
-            />
+      {/* TRAIN-TEST SPLIT */}
+      <div style={card}>
+        <div style={sectionLabel}><span>✂️</span> Train-Test Split</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '.6rem' }}>
+              <span style={{ fontSize: '.78rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>Test Size</span>
+              <span style={{ fontFamily: 'JetBrains Mono,monospace', fontSize: '.82rem', fontWeight: 700, color: G }}>{testSize}%</span>
+            </div>
+            <input type="range" min="10" max="50" value={testSize} onChange={(e) => setTestSize(e.target.value)}
+              style={{ width: '100%', accentColor: G }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '.3rem' }}>
+              <span style={{ fontSize: '.68rem', color: 'rgba(255,255,255,0.22)' }}>10%</span>
+              <span style={{ fontSize: '.68rem', color: 'rgba(255,255,255,0.22)' }}>50%</span>
+            </div>
           </div>
-          <div className="form-group">
-            <label>Random State</label>
-            <input
-              type="number"
-              value={randomState}
-              onChange={(e) => setRandomState(e.target.value)}
-            />
+          <div>
+            <div style={{ fontSize: '.78rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600, marginBottom: '.6rem' }}>Random State</div>
+            <input type="number" value={randomState} onChange={(e) => setRandomState(e.target.value)}
+              style={{ width: '100%', padding: '.65rem 1rem', borderRadius: 10, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#fff', fontSize: '.9rem', fontFamily: 'JetBrains Mono,monospace', fontWeight: 600, outline: 'none', boxSizing: 'border-box' }} />
           </div>
         </div>
       </div>
 
-      {warnings.length ? (
-        <div className="alert alert-warning">
-          {warnings.join(' ')}
-        </div>
-      ) : null}
-      {error && <div className="alert alert-warning">{error}</div>}
-      {success && <div className="alert alert-success">Preprocessing complete. Supervised models are now unlocked.</div>}
+      {/* ALERTS */}
+      {duplicateColumns.length > 0 && <div style={{ padding: '1rem 1.25rem', borderRadius: 12, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: 'rgba(252,165,165,.85)', fontSize: '.83rem', marginBottom: '1.25rem' }}>⚠️ <strong>Duplicate Encoding:</strong> Column(s) ({duplicateColumns.join(', ')}) have multiple encodings applied. Please select only one encoding per column.</div>}
+      {warnings.length > 0 && <div style={{ padding: '1rem 1.25rem', borderRadius: 12, background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', color: 'rgba(253,230,138,.85)', fontSize: '.83rem', marginBottom: '1.25rem' }}>⚠️ {warnings.join(' ')}</div>}
+      {error && <div style={{ padding: '1rem 1.25rem', borderRadius: 12, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: 'rgba(252,165,165,.85)', fontSize: '.83rem', marginBottom: '1.25rem' }}>❌ {error}</div>}
+      {success && <div style={{ padding: '1rem 1.25rem', borderRadius: 12, background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', color: 'rgba(134,239,172,.85)', fontSize: '.83rem', marginBottom: '1.25rem' }}>✅ Preprocessing complete. Supervised models are now unlocked.</div>}
 
-      <button
-        type="button"
-        className="btn btn-primary btn-block"
-        onClick={handleApply}
-        disabled={loading || columns.length === 0}
-      >
-        {loading ? 'Processing...' : 'Apply Preprocessing'}
+      {/* SUBMIT */}
+      <button type="button" onClick={handleApply} disabled={loading || columns.length === 0 || duplicateColumns.length > 0}
+        style={{
+          width: '100%', padding: '1rem 2rem', borderRadius: 14, border: 'none', color: '#fff',
+          fontSize: '1rem', fontFamily: 'Space Grotesk,sans-serif', fontWeight: 800, letterSpacing: '.04em',
+          background: loading ? 'rgba(34,197,94,.5)' : 'linear-gradient(135deg,#16a34a 0%,#22c55e 60%,#4ade80 100%)',
+          cursor: (loading || columns.length === 0 || duplicateColumns.length > 0) ? 'not-allowed' : 'pointer',
+          boxShadow: loading ? 'none' : '0 8px 32px rgba(34,197,94,.35)',
+          opacity: (columns.length === 0 || duplicateColumns.length > 0) ? .5 : 1, transition: 'all .2s ease',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem',
+        }}>
+        {loading
+          ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,.3)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin .7s linear infinite' }} /> Processing…</>
+          : <><span style={{ fontSize: '1.1rem' }}>🚀</span> Apply Preprocessing</>}
       </button>
     </div>
   )

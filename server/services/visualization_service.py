@@ -186,17 +186,22 @@ def _chart_support(chart_id: str, df: pd.DataFrame) -> tuple[bool, Optional[str]
 def build_visualization_metadata(df: pd.DataFrame) -> dict[str, Any]:
     types = _column_type_map(df)
     column_meta = []
+    
+    n_total = len(df)
+    # Use a smaller sample for nunique if the dataframe is large to save time
+    sample_df = df.sample(n=min(n_total, 10_000), random_state=42) if n_total > 10_000 else df
 
     for column in df.columns:
         series = df[column]
         name = str(column)
+        
         column_meta.append(
             {
                 "column": name,
                 "kind": types[name],
                 "dtype": str(series.dtype),
                 "missing": int(series.isna().sum()),
-                "unique": int(series.nunique(dropna=True)),
+                "unique": int(sample_df[name].nunique(dropna=True)),
             }
         )
 
@@ -230,6 +235,10 @@ def sync_visualization_dataset(
         "dataset": build_dataset_payload(frame, name or "Dataset"),
         "metadata": build_visualization_metadata(frame),
     }
+    # Deduct 20 UC for visualization tasks
+    if not session.is_free_rerun:
+        session.user_balance -= 20
+        session.save()
     return frame, payload
 
 

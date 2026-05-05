@@ -72,84 +72,160 @@ export default function TrainStep({ preprocessData, status, onTrained, setStatus
     value: parseFloat((row[primaryMetric] ?? 0).toFixed(4)),
   })) || []
 
-  return (
-    <div>
-      <h1 className="page-title">Supervised Models</h1>
-      <p className="page-subtitle">Train and compare supervised models using the shared backend dataset session.</p>
+  const MODELS = [
+    { name: 'Random Forest',     icon: '🌲', color: '#22c55e' },
+    { name: 'Gradient Boosting', icon: '⚡', color: '#f59e0b' },
+    { name: 'Logistic Reg.',     icon: '📈', color: '#60a5fa' },
+    { name: 'Decision Tree',     icon: '🌿', color: '#a78bfa' },
+    { name: 'SVM',               icon: '🔷', color: '#f472b6' },
+  ]
 
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <div className="section-title">Model Training</div>
-        <div className="alert alert-info">
-          Task type: <strong>{preprocessData?.task_type || status.task_type || '-'}</strong>
+  return (
+    <div style={{ fontFamily: 'Inter,sans-serif' }}>
+
+      {/* PAGE HEADER */}
+      <div style={{ marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', marginBottom: '.4rem' }}>
+          <span style={{ fontSize: '1.4rem' }}>🧠</span>
+          <h1 style={{ margin: 0, fontFamily: 'Space Grotesk,sans-serif', fontWeight: 800, fontSize: '1.65rem', color: '#fff' }}>Supervised Models</h1>
+        </div>
+        <p style={{ margin: 0, color: 'rgba(255,255,255,0.38)', fontSize: '.85rem', paddingLeft: '2.1rem' }}>
+          Train and compare supervised models using the shared backend dataset session.
+        </p>
+      </div>
+
+      {/* TRAIN CARD */}
+      <div style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 18, padding: '1.5rem 1.75rem', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginBottom: '1rem' }}>
+          <span style={{ fontSize: '.75rem', fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.38)', fontFamily: 'Space Grotesk,sans-serif' }}>⚙️ Configuration</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '.85rem 1.1rem', borderRadius: 12, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.2)', marginBottom: '1rem' }}>
+          <span style={{ fontSize: '1.1rem' }}>🎯</span>
+          <div>
+            <div style={{ fontSize: '.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>Task Type</div>
+            <div style={{ fontFamily: 'Space Grotesk,sans-serif', fontWeight: 700, color: '#22c55e', fontSize: '.95rem' }}>{preprocessData?.task_type || status.task_type || '—'}</div>
+          </div>
         </div>
         {expectsLargeDatasetMode && !result && (
-          <div className="alert alert-info">
-            Large dataset mode will use scalable models, reduced memory pressure, and skip expensive
-            cross-validation so training remains stable on big CSVs.
+          <div style={{ padding: '.85rem 1.1rem', borderRadius: 12, background: 'rgba(96,165,250,.06)', border: '1px solid rgba(96,165,250,.2)', color: 'rgba(147,210,255,.8)', fontSize: '.82rem', marginBottom: '1rem' }}>
+            ⚡ Large dataset mode — scalable models, reduced memory, CV skipped for stability.
           </div>
         )}
-        {error && <div className="alert alert-warning">{error}</div>}
-        <button className="btn btn-primary btn-block" onClick={handleTrain} disabled={loading}>
-          {loading ? 'Training all models...' : 'Train all supervised models'}
+        {error && <div style={{ padding: '.85rem 1.1rem', borderRadius: 12, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', color: 'rgba(252,165,165,.9)', fontSize: '.83rem', marginBottom: '1rem' }}>❌ {error}</div>}
+        <button onClick={handleTrain} disabled={loading} style={{
+          width: '100%', padding: '1rem 2rem', borderRadius: 14, border: 'none', color: '#fff',
+          fontSize: '1rem', fontFamily: 'Space Grotesk,sans-serif', fontWeight: 800, letterSpacing: '.04em',
+          background: loading ? 'rgba(34,197,94,.4)' : 'linear-gradient(135deg,#16a34a 0%,#22c55e 60%,#4ade80 100%)',
+          cursor: loading ? 'not-allowed' : 'pointer',
+          boxShadow: loading ? 'none' : '0 8px 32px rgba(34,197,94,.35)',
+          transition: 'all .2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '.6rem',
+        }}>
+          {loading
+            ? <><span style={{ width: 16, height: 16, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,.3)', borderTopColor: '#fff', display: 'inline-block', animation: 'spin .7s linear infinite' }} /> Initiating training pipeline…</>
+            : <><span style={{ fontSize: '1.1rem' }}>🚀</span> Train All Supervised Models</>}
         </button>
       </div>
 
-      {(loading || hydrating) && (
-        <div className="spinner-wrap">
-          <div className="spinner" />
-          <span>{loading ? 'Training models...' : 'Loading saved training results...'}</span>
+      {/* ── TRAINING ANIMATION ── */}
+      {loading && (
+        <div style={{ marginBottom: '1.5rem' }}>
+          <style>{`
+            @keyframes train-pulse { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:1;transform:scale(1.15)} }
+            @keyframes train-bar { from{width:0} to{width:var(--tw)} }
+            @keyframes train-glow { 0%,100%{box-shadow:0 0 20px rgba(34,197,94,.15)} 50%{box-shadow:0 0 50px rgba(34,197,94,.4)} }
+            @keyframes train-orbit { 0%{transform:rotate(0deg) translateX(36px)} 100%{transform:rotate(360deg) translateX(36px)} }
+            @keyframes train-fade { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+          `}</style>
+
+          {/* Neural Net Orb */}
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'center', padding:'2.5rem 1.5rem', background:'rgba(255,255,255,.025)', border:'1px solid rgba(34,197,94,.2)', borderRadius:22, marginBottom:'1.25rem', animation:'train-glow 2s ease-in-out infinite', position:'relative', overflow:'hidden' }}>
+            <div style={{ position:'absolute', inset:0, background:'radial-gradient(ellipse 60% 40% at 50% 0%,rgba(34,197,94,.12),transparent 70%)', pointerEvents:'none' }} />
+            {/* Orbiting dots */}
+            <div style={{ position:'relative', width:90, height:90, marginBottom:'1.5rem' }}>
+              <div style={{ position:'absolute', inset:0, borderRadius:'50%', border:'1.5px solid rgba(34,197,94,.25)', animation:'train-glow 1.5s ease-in-out infinite' }} />
+              <div style={{ position:'absolute', inset:'50%', width:18, height:18, marginLeft:-9, marginTop:-9, borderRadius:'50%', background:'linear-gradient(135deg,#22c55e,#4ade80)', boxShadow:'0 0 24px rgba(34,197,94,.8)' }} />
+              {MODELS.map((m, i) => {
+                const orbitDur = 3
+                const delay = `-${(orbitDur / 5) * i}s`
+                return (
+                  <div key={i} style={{ position:'absolute', top:'50%', left:'50%', width:0, height:0, animation:`train-orbit ${orbitDur}s linear ${delay} infinite`, transformOrigin:'0 0' }}>
+                    <div style={{ width:9, height:9, borderRadius:'50%', background:m.color, boxShadow:`0 0 12px ${m.color}`, position:'absolute', top:-4.5, left:-4.5 }} />
+                  </div>
+                )
+              })}
+            </div>
+            <div style={{ fontFamily:'Space Grotesk,sans-serif', fontWeight:800, fontSize:'1.1rem', color:'#fff', marginBottom:'.4rem', zIndex:1 }}>Training Neural Pipeline</div>
+            <div style={{ fontSize:'.8rem', color:'rgba(255,255,255,.45)', zIndex:1 }}>Fitting models · Optimizing hyperparameters · Evaluating metrics</div>
+          </div>
+
+          {/* Per-model animated bars */}
+          <div style={{ display:'flex', flexDirection:'column', gap:'.75rem' }}>
+            {MODELS.map((m, i) => {
+              const pct = [92, 78, 65, 55, 40][i]
+              return (
+                <div key={m.name} style={{ background:'rgba(255,255,255,.03)', border:'1px solid rgba(255,255,255,.07)', borderRadius:14, padding:'1rem 1.25rem', animation:`train-fade .4s ease ${i * .12}s both` }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'.65rem' }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:'.6rem' }}>
+                      <span style={{ fontSize:'1.05rem' }}>{m.icon}</span>
+                      <span style={{ fontFamily:'Space Grotesk,sans-serif', fontWeight:700, fontSize:'.85rem', color:'#fff' }}>{m.name}</span>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:'.5rem' }}>
+                      <span style={{ width:7, height:7, borderRadius:'50%', background:m.color, boxShadow:`0 0 8px ${m.color}`, display:'inline-block', animation:'train-pulse 1.2s ease-in-out infinite', animationDelay:`${i*0.2}s` }} />
+                      <span style={{ fontFamily:'JetBrains Mono,monospace', fontSize:'.72rem', color:m.color, fontWeight:700 }}>Training…</span>
+                    </div>
+                  </div>
+                  <div style={{ height:6, borderRadius:999, background:'rgba(255,255,255,.07)', overflow:'hidden' }}>
+                    <div style={{
+                      height:'100%', borderRadius:999,
+                      background:`linear-gradient(90deg,${m.color},${m.color}aa)`,
+                      boxShadow:`0 0 12px ${m.color}66`,
+                      width:`${pct}%`,
+                      animation:`train-bar ${1.5 + i * 0.4}s cubic-bezier(.22,1,.36,1) ${i*0.15}s both`,
+                    }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {hydrating && !loading && (
+        <div style={{ display:'flex', alignItems:'center', gap:'1rem', padding:'1.5rem', background:'rgba(255,255,255,.03)', border:'1px solid rgba(255,255,255,.08)', borderRadius:14, marginBottom:'1.5rem' }}>
+          <span style={{ width:20, height:20, borderRadius:'50%', border:'2.5px solid rgba(255,255,255,.2)', borderTopColor:'#22c55e', display:'inline-block', animation:'spin .7s linear infinite', flexShrink:0 }} />
+          <span style={{ color:'rgba(255,255,255,.6)', fontSize:'.88rem' }}>Loading saved training results…</span>
         </div>
       )}
 
       {result && !loading && (
         <>
           {result.large_dataset_mode && (
-            <div className="alert alert-info" style={{ marginBottom: '1rem' }}>
-              Large dataset mode trained on <strong>{(result.train_rows_used || 0).toLocaleString()}</strong> sampled
-              training rows and evaluated on <strong>{(result.test_rows_used || 0).toLocaleString()}</strong> test rows.
-              {!result.cv_enabled && ' Cross-validation was skipped to keep runtime predictable.'}
+            <div style={{ padding:'.85rem 1.1rem', borderRadius:12, background:'rgba(96,165,250,.06)', border:'1px solid rgba(96,165,250,.2)', color:'rgba(147,210,255,.8)', fontSize:'.82rem', marginBottom:'1.25rem' }}>
+              ⚡ Large dataset mode — trained on <strong>{(result.train_rows_used||0).toLocaleString()}</strong> rows, tested on <strong>{(result.test_rows_used||0).toLocaleString()}</strong> rows.
+              {!result.cv_enabled && ' Cross-validation skipped.'}
             </div>
           )}
-          <div className="best-banner">
-            <div className="best-banner-label">Best Model</div>
-            <div className="best-banner-name">{result.best_model_name}</div>
-          </div>
-
+          <div className="best-banner"><div className="best-banner-label">Best Model</div><div className="best-banner-name">{result.best_model_name}</div></div>
           <BestMetrics metrics={result.best_metrics} taskType={result.task_type} />
           <TuningSummary metrics={result.best_metrics} taskType={result.task_type} />
-
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="section-title">Performance Comparison - {primaryMetric}</div>
-            <div className="chart-wrap" style={{ height: 360 }}>
+          <div className="card" style={{ marginBottom:'1rem' }}>
+            <div className="section-title">Performance Comparison — {primaryMetric}</div>
+            <div className="chart-wrap" style={{ height:360 }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 28, right: 16, left: 4, bottom: 30 }}>
+                <BarChart data={chartData} margin={{ top:28, right:16, left:4, bottom:30 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#2a3551" />
-                  <XAxis dataKey="name" tick={{ fill: '#aebad3', fontSize: 12 }} angle={-20} textAnchor="end" />
-                  <YAxis
-                    tick={{ fill: '#c5d2eb', fontSize: 12 }}
-                    tickFormatter={(value) => formatAxisTick(value, primaryMetric)}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                    content={<ChartTooltip metricLabel={primaryMetric} />}
-                  />
-                  <Bar dataKey="value" radius={[8, 8, 0, 0]}>
-                    <LabelList
-                      dataKey="value"
-                      position="top"
-                      content={(props) => <ValueLabel {...props} metricLabel={primaryMetric} />}
-                    />
-                    {chartData.map((_, index) => <Cell key={index} fill={COLORS[index % COLORS.length]} />)}
+                  <XAxis dataKey="name" tick={{ fill:'#aebad3', fontSize:12 }} angle={-20} textAnchor="end" />
+                  <YAxis tick={{ fill:'#c5d2eb', fontSize:12 }} tickFormatter={(v)=>formatAxisTick(v,primaryMetric)} />
+                  <Tooltip cursor={{ fill:'rgba(255,255,255,0.04)' }} content={<ChartTooltip metricLabel={primaryMetric} />} />
+                  <Bar dataKey="value" radius={[8,8,0,0]}>
+                    <LabelList dataKey="value" position="top" content={(props)=><ValueLabel {...props} metricLabel={primaryMetric} />} />
+                    {chartData.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]} />)}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
-
-          <div className="card">
-            <div className="section-title">Model Comparison Table</div>
-            <ResultsTable results={result.results} primaryMetric={primaryMetric} bestModel={result.best_model_name} />
-          </div>
+          <div className="card"><div className="section-title">Model Comparison Table</div><ResultsTable results={result.results} primaryMetric={primaryMetric} bestModel={result.best_model_name} /></div>
         </>
       )}
     </div>

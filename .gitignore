@@ -1,10 +1,18 @@
+# Python
 venv/
 .venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+
+# Environment files
 .env
 .env.local
 .env.*.local
+
+# Node / Next.js
 client/node_modules/
 server/node_modules/
 .next/
@@ -12,12 +20,29 @@ client/.next/
 client/.next-dev/
 dist/
 build/
+
+# Logs — NEVER commit these
 *.log
 *.err.log
+
+# Temp / cache dirs
 .tmp/
 .cache/
+.uv-cache/
 server/.cache/
+server/.tmp/
+server/.uv-cache/
+server/.agents/
+
+# IDE / OS
+.DS_Store
+.vscode/settings.json
+Thumbs.db
+
+# Python upload temp
+uploads/
+server/uploads/
+
+# Removed test artifacts
 nested-direct-test.txt
 test-launch.txt
-.DS_Store
-.env

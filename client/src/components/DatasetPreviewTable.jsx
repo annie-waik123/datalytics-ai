@@ -15,7 +15,7 @@ export default function DatasetPreviewTable({ rows = [], columns = [], types = {
           </div>
         ))}
       </div>
-      <DataTable rows={previewRows} columns={columns} pageSize={20} sortable highlightNulls />
+      <DataTable rows={previewRows} columns={columns} pageSize={20} sortable highlightNulls editable={true} />
     </div>
   );
 }

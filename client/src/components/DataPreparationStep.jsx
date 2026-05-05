@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import DataTable from './DataTable.jsx'
 import { useToast } from '../hooks/useToast.js'
 import { buildDatasetProfile } from '../utils/dataset.js'
+import CustomDropdown from './ui/CustomDropdown.jsx';
 import {
   TARGET_ALL_COLUMNS,
   TARGET_ALL_CATEGORICAL,
@@ -248,8 +249,10 @@ export default function DataPreparationStep({
       if (raw === null || raw === undefined || raw === '') return { ...row, [col]: null }
       try {
         if (toType === 'number') {
-          const n = Number(raw)
-          return { ...row, [col]: isNaN(n) ? null : n }
+          if (typeof raw === 'number') return { ...row, [col]: raw }
+          const cleaned = String(raw).replace(/[^\d.-]/g, '')
+          const n = Number(cleaned)
+          return { ...row, [col]: isNaN(n) || cleaned === '' ? null : n }
         }
         if (toType === 'boolean') {
           const s = String(raw).trim().toLowerCase()
@@ -284,7 +287,13 @@ export default function DataPreparationStep({
     cols.forEach((col) => {
       // Only attempt auto-fix on non-numeric looking columns
       const sample = rows.slice(0, 100).map((r) => r[col]).filter((v) => v !== null && v !== '')
-      const allNumeric = sample.length > 0 && sample.every((v) => !isNaN(Number(v)))
+      
+      const allNumeric = sample.length > 0 && sample.every((v) => {
+        if (typeof v === 'number') return true
+        const cleaned = String(v).replace(/[^\d.-]/g, '')
+        return cleaned !== '' && !isNaN(Number(cleaned))
+      })
+
       if (allNumeric && workingProfile?.types?.[col] !== 'number') {
         rows = coerceColumn(rows, col, 'number')
         fixed.push(col)
@@ -492,20 +501,20 @@ export default function DataPreparationStep({
           <div className="prep-form-grid">
             <label className="prep-field">
               <span>Target</span>
-              <select value={fillTarget} onChange={(event) => setFillTarget(event.target.value)}>
+              <CustomDropdown value={fillTarget} onChange={(value) => setFillTarget(value)}>
                 {getSelectOptions(workingProfile, 'fill').map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">
               <span>Method</span>
-              <select value={fillMethod} onChange={(event) => setFillMethod(event.target.value)}>
+              <CustomDropdown value={fillMethod} onChange={(value) => setFillMethod(value)}>
                 {fillOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </CustomDropdown>
             </label>
 
             {fillMethod === 'constant' && (
@@ -548,19 +557,19 @@ export default function DataPreparationStep({
           <div className="prep-form-grid">
             <label className="prep-field">
               <span>Numeric Target</span>
-              <select value={outlierTarget} onChange={(event) => setOutlierTarget(event.target.value)}>
+              <CustomDropdown value={outlierTarget} onChange={(value) => setOutlierTarget(value)}>
                 {getSelectOptions(workingProfile, 'outliers').map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">
               <span>Action</span>
-              <select value={outlierMode} onChange={(event) => setOutlierMode(event.target.value)}>
+              <CustomDropdown value={outlierMode} onChange={(value) => setOutlierMode(value)}>
                 <option value="remove">Remove Outlier Rows</option>
                 <option value="cap">Cap to IQR Bounds</option>
-              </select>
+              </CustomDropdown>
             </label>
           </div>
 
@@ -592,19 +601,19 @@ export default function DataPreparationStep({
           <div className="prep-form-grid">
             <label className="prep-field">
               <span>Column Scope</span>
-              <select value={replaceTarget} onChange={(event) => setReplaceTarget(event.target.value)}>
+              <CustomDropdown value={replaceTarget} onChange={(value) => setReplaceTarget(value)}>
                 {getSelectOptions(workingProfile, 'replace').map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">
               <span>Replace Mode</span>
-              <select value={replaceMode} onChange={(event) => setReplaceMode(event.target.value)}>
+              <CustomDropdown value={replaceMode} onChange={(value) => setReplaceMode(value)}>
                 <option value="contains">Replace Matching Text</option>
                 <option value="exact">Replace Whole Cell Only</option>
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">
@@ -768,12 +777,12 @@ export default function DataPreparationStep({
           <div className="prep-form-grid">
             <label className="prep-field">
               <span>Target Column</span>
-              <select value={textCleanTarget} onChange={(e) => setTextCleanTarget(e.target.value)}>
+              <CustomDropdown value={textCleanTarget} onChange={(value) => setTextCleanTarget(value)}>
                 <option value="__all_text__">All Text Columns</option>
                 {workingDataset.columns
                   .filter((c) => workingProfile?.types?.[c] !== 'number')
                   .map((col) => <option key={col} value={col}>{col}</option>)}
-              </select>
+              </CustomDropdown>
             </label>
 
             <div className="prep-field">
@@ -859,23 +868,23 @@ export default function DataPreparationStep({
           <div className="prep-form-grid">
             <label className="prep-field">
               <span>Select Column</span>
-              <select value={dtypeTarget} onChange={(e) => setDtypeTarget(e.target.value)}>
+              <CustomDropdown value={dtypeTarget} onChange={(value) => setDtypeTarget(value)}>
                 <option value="">— Pick a column —</option>
                 <option value="__all__">All Columns</option>
                 {workingDataset.columns.map((col) => (
                   <option key={col} value={col}>{col}</option>
                 ))}
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">
               <span>Convert To</span>
-              <select value={dtypeType} onChange={(e) => setDtypeType(e.target.value)}>
+              <CustomDropdown value={dtypeType} onChange={(value) => setDtypeType(value)}>
                 <option value="number">Numeric (Float / Int)</option>
                 <option value="string">Text / String</option>
                 <option value="boolean">Boolean (true / false)</option>
                 <option value="date">Date (YYYY-MM-DD)</option>
-              </select>
+              </CustomDropdown>
             </label>
           </div>
 
@@ -910,20 +919,20 @@ export default function DataPreparationStep({
           <div className="prep-form-grid">
             <label className="prep-field">
               <span>Numeric Column</span>
-              <select value={validCol} onChange={(e) => { setValidCol(e.target.value); setValidResult(null) }}>
+              <CustomDropdown value={validCol} onChange={(value) => { setValidCol(value); setValidResult(null) }}>
                 <option value="">— Pick a column —</option>
                 {workingDataset.columns
                   .filter((c) => workingProfile?.types?.[c] === 'number')
                   .map((col) => <option key={col} value={col}>{col}</option>)}
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">
               <span>Fix Action</span>
-              <select value={validAction} onChange={(e) => setValidAction(e.target.value)}>
+              <CustomDropdown value={validAction} onChange={(value) => setValidAction(value)}>
                 <option value="nullify">Set Invalid to Null</option>
                 <option value="drop">Drop Invalid Rows</option>
-              </select>
+              </CustomDropdown>
             </label>
 
             <label className="prep-field">

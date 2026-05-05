@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import CustomDropdown from './ui/CustomDropdown.jsx';
 
 // ── constants ──────────────────────────────────────────────────
 const STORAGE_KEY = 'datalytics-notebooks'
@@ -421,7 +422,7 @@ export default function NotebookStep() {
               )}
 
               {/* font picker */}
-              <select
+              <CustomDropdown
                 value={active.font}
                 onChange={e => updateActive({ font: e.target.value })}
                 style={{
@@ -432,7 +433,7 @@ export default function NotebookStep() {
                 }}
               >
                 {FONTS.map(f => <option key={f.value} value={f.value} style={{ background: '#0f172a' }}>{f.label}</option>)}
-              </select>
+              </CustomDropdown>
 
               {/* font size */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

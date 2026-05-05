@@ -398,6 +398,10 @@ def build_dataset_analysis_summary(session: Any, session_id: str) -> dict[str, A
             "insights": insights,
         }
     )
+    # Deduct 20 UC for dataset analysis
+    if not session.is_free_rerun:
+        session.user_balance -= 20
+        session.save()
     cache.set_json(cache_key, payload, ttl_seconds=300)
     return payload
 

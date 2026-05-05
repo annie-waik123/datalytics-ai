@@ -542,7 +542,8 @@ export default function PowerBIDashboardStep({
       title: suggestion.title,
       mapping: suggestion.mapping,
       layout: nextOpenLayout(previous.widgets, definition.defaultSize),
-      loading: true,
+      loading: request.insight ? false : true, // If we're passing pre-generated text, it's not loading!
+      insight: request.insight || '', // Store the AI response text here
     })
 
     const nextState = commitState({
@@ -551,9 +552,12 @@ export default function PowerBIDashboardStep({
       widgets: [...previous.widgets, widget],
     })
 
-    addToast(`${widget.title} added from the chatbot.`, null, 'success')
+    // Toast removed here to prevent duplicates with App.jsx
+
     onComplete('powerbi')
-    await renderWidget(widget.id, nextState)
+    if (!request.insight) {
+      await renderWidget(widget.id, nextState)
+    }
   }
 
   useEffect(() => {

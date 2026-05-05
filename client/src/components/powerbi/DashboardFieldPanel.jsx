@@ -1,5 +1,6 @@
 import React, { useRef, useState } from 'react'
 import { POWER_BI_CHARTS, chartDefinition, fieldOptionsForSlot, FIELD_SLOT_DEFINITIONS } from '../../utils/dashboardBuilder.js'
+import CustomDropdown from '../ui/CustomDropdown.jsx';
 
 /* ─── tiny helpers ─────────────────────────────────────── */
 const S = {
@@ -141,21 +142,21 @@ function SlotCard({ slotKey, widget, metadata, onChangeValue, onAppendValue, onR
           ? <FieldChip label={String(values)} onRemove={() => onRemoveValue(slotKey, values)} />
           : <span style={{ fontSize: 10.5, color: '#7f96b8', fontStyle: 'italic' }}>No field set</span>}
       </div>
-      <select
+      <CustomDropdown
         style={S.select}
         value=""
-        onChange={(e) => {
-          if (!e.target.value) return
+        onChange={(val) => {
+          if (!val) return
           if (isMulti) {
-            onAppendValue(slotKey, e.target.value)   // append to array
+            onAppendValue(slotKey, val)   // append to array
           } else {
-            onChangeValue(slotKey, e.target.value)    // replace single value
+            onChangeValue(slotKey, val)    // replace single value
           }
         }}
       >
         <option value="">Add field</option>
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
+      </CustomDropdown>
     </div>
   )
 }
@@ -275,17 +276,17 @@ export default function DashboardFieldPanel({
                 </label>
                 <label style={S.label}>
                   Chart Type
-                  <select style={S.select} value={widget.chartType} onChange={(e) => onChangeChartType(e.target.value)}>
+                  <CustomDropdown style={S.select} value={widget.chartType} onChange={(val) => onChangeChartType(val)}>
                     {POWER_BI_CHARTS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-                  </select>
+                  </CustomDropdown>
                 </label>
                 <label style={S.label}>
                   Aggregation
-                  <select style={S.select} value={widget.mapping?.aggregation || 'sum'} onChange={(e) => onChangeAggregation(e.target.value)}>
+                  <CustomDropdown style={S.select} value={widget.mapping?.aggregation || 'sum'} onChange={(val) => onChangeAggregation(val)}>
                     {(metadata?.aggregations || ['sum', 'avg', 'count', 'min', 'max']).map((v) =>
                       <option key={v} value={v}>{v.toUpperCase()}</option>
                     )}
-                  </select>
+                  </CustomDropdown>
                 </label>
               </div>
             )}
@@ -347,11 +348,11 @@ export default function DashboardFieldPanel({
 
                 <label style={S.label}>
                   Chart Size
-                  <select style={S.select} value={settings.size || 'medium'} onChange={(e) => onUpdateWidgetSettings({ size: e.target.value })}>
+                  <CustomDropdown style={S.select} value={settings.size || 'medium'} onChange={(val) => onUpdateWidgetSettings({ size: val })}>
                     <option value="small">Small</option>
                     <option value="medium">Medium</option>
                     <option value="large">Large</option>
-                  </select>
+                  </CustomDropdown>
                 </label>
 
                 <button

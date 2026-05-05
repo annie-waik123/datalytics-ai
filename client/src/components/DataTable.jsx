@@ -11,6 +11,7 @@ export default function DataTable({
   maxHeight = 420,
   virtualizeThreshold = 200,
   rowHeight = 44,
+  editable = false,
 }) {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ column: null, dir: 'asc' });
@@ -93,23 +94,40 @@ export default function DataTable({
                 <td colSpan={cols.length} style={{ height: `${topSpacer}px` }} />
               </tr>
             ) : null}
-            {visibleRows.map((row, index) => (
-              <tr key={`${startIndex + index}`}>
-                {cols.map((column) => {
-                  const value = row[column];
-                  const isNull = value == null || value === '';
-                  return (
-                    <td
-                      key={`${startIndex + index}-${column}`}
-                      className={isNull && highlightNulls ? 'null-cell' : ''}
-                      style={{ whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                    >
-                      {isNull ? 'NULL' : String(value)}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+            {visibleRows.map((row, index) => {
+              const rowHasNull = highlightNulls && cols.some((col) => {
+                const v = row[col];
+                return v == null || v === '';
+              });
+              return (
+                <tr key={`${startIndex + index}`} className={rowHasNull ? 'row-has-null' : ''}>
+                  {cols.map((column) => {
+                    const value = row[column];
+                    const isNull = value == null || value === '';
+                    return (
+                      <td
+                        key={`${startIndex + index}-${column}`}
+                        className={isNull && highlightNulls ? 'null-cell' : ''}
+                        style={{ whiteSpace: 'nowrap', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', outline: 'none' }}
+                        contentEditable={editable}
+                        suppressContentEditableWarning={editable}
+                        onBlur={(e) => {
+                          if (!editable) return;
+                          const newVal = e.target.textContent;
+                          if (newVal !== 'NULL') {
+                            row[column] = newVal;
+                          } else if (newVal === 'NULL' || newVal.trim() === '') {
+                            row[column] = null;
+                          }
+                        }}
+                      >
+                        {isNull ? 'NULL' : (typeof value === 'object' ? JSON.stringify(value) : String(value))}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
             {useVirtualization && bottomSpacer > 0 ? (
               <tr aria-hidden="true" className="table-spacer">
                 <td colSpan={cols.length} style={{ height: `${bottomSpacer}px` }} />

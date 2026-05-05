@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environments
+venv/
+.venv/
+.uv-cache/
+
+# Environment — NEVER commit
+.env
+.env.*
+
+# Logs — NEVER commit
+*.log
+*.err.log
+
+# Temp / cache
+.tmp/
+.cache/
+.local/
+.agents/
+
+# Uploads (large binary files)
+uploads/
+*.csv
+*.xlsx
+*.parquet
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Celery
+celerybeat-schedule
+celerybeat.pid

@@ -21,3 +21,4 @@ razorpay
 PyJWT
 bcrypt
 google-auth
+openai

@@ -8,7 +8,7 @@
  */
 import client from './client.js'
 
-const VALID_MODES = new Set(['chat', 'ai_insights', 'recommendation_insights'])
+const VALID_MODES = new Set(['chat', 'ai_insights', 'recommendation_insights', 'decision_making'])
 
 // Longer timeout for AI modes that need more compute time
 const AI_TIMEOUT_MS = 120_000   // 2 min for insights/recommendations
@@ -58,23 +58,23 @@ export async function fetchChatHistory() {
  * @param {string} message - User message text
  * @param {string|null} [mode]  - Optional mode: "chat" | "ai_insights" | "recommendation_insights"
  */
-export async function sendChatMessage(message, mode = null) {
+export async function sendChatMessage(message, mode = null, options = {}) {
   const payload = { message: String(message).trim() }
   if (mode && VALID_MODES.has(mode)) {
     payload.mode = mode
   }
-  const response = await client.post('/chat', payload, { timeout: CHAT_TIMEOUT_MS })
+  const response = await client.post('/chat', payload, { timeout: CHAT_TIMEOUT_MS, signal: options.signal })
   return response.data
 }
 
 /**
  * Send a message in AI Insights mode (deep pattern analysis).
  */
-export async function sendAIInsightsMessage(message) {
+export async function sendAIInsightsMessage(message, options = {}) {
   const response = await client.post(
     '/chat/ai-insights',
     { message: String(message).trim() },
-    { timeout: AI_TIMEOUT_MS },
+    { timeout: AI_TIMEOUT_MS, signal: options.signal },
   )
   return response.data
 }
@@ -82,11 +82,11 @@ export async function sendAIInsightsMessage(message) {
 /**
  * Send a message in Recommendation Insights mode (business strategy).
  */
-export async function sendRecommendationsMessage(message) {
+export async function sendRecommendationsMessage(message, options = {}) {
   const response = await client.post(
     '/chat/recommendations',
     { message: String(message).trim() },
-    { timeout: AI_TIMEOUT_MS },
+    { timeout: AI_TIMEOUT_MS, signal: options.signal },
   )
   return response.data
 }
@@ -115,6 +115,6 @@ export async function checkChatHealth() {
     const response = await client.get('/chat/health', { timeout: 8_000 })
     return response.data
   } catch {
-    return { status: 'error', groq_configured: false }
+    return { status: 'error', configured: false, groq_configured: false }
   }
 }

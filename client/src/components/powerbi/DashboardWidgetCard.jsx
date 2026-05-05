@@ -167,6 +167,20 @@ function DashboardWidgetCard({
           <div className="builder-widget-resize-preview">
             <div className="builder-widget-resize-preview-grid" aria-hidden="true" />
           </div>
+        ) : widget.chartType === 'text_box' ? (
+          <div className="builder-widget-text-box" style={{ padding: '1rem', overflowY: 'auto', height: '100%', fontSize: '0.9rem', lineHeight: '1.6', color: 'var(--text-primary, #f8fafc)' }}>
+            {widget.insight?.split('\n').map((line, idx) => {
+              if (!line.trim()) return <br key={idx} />
+              // Basic bold markdown support just in case
+              const parts = line.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                  return <strong key={i} style={{ color: '#fff' }}>{part.slice(2, -2)}</strong>;
+                }
+                return part;
+              });
+              return <div key={idx} style={{ marginBottom: '0.5rem' }}>{parts}</div>
+            }) || 'Empty Text Box'}
+          </div>
         ) : widget.figure && !deferHeavyRendering ? (
           (() => {
             // Patch the figure layout dynamically based on client-side settings
@@ -238,7 +252,7 @@ function DashboardWidgetCard({
         ) : null}
       </div>
 
-      <footer className="builder-widget-footer">
+      <footer className="builder-widget-footer" style={{ display: widget.chartType === 'text_box' ? 'none' : 'block' }}>
         <p>{widget.insight || 'AI insights will appear here...'}</p>
       </footer>
 

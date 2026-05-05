@@ -335,7 +335,6 @@
   background: rgba(255, 123, 28, 0.12);
 }
 
-.builder-chart-library,
 .builder-sidebar-right {
   overflow: auto;
 }
@@ -1797,21 +1796,21 @@
   }
 }
 
-.builder-chart-library::-webkit-scrollbar,
+.builder-sidepanel-content::-webkit-scrollbar,
 .builder-sidebar-right::-webkit-scrollbar,
 .builder-dashboard-canvas::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-.builder-chart-library::-webkit-scrollbar-thumb,
+.builder-sidepanel-content::-webkit-scrollbar-thumb,
 .builder-sidebar-right::-webkit-scrollbar-thumb,
 .builder-dashboard-canvas::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(148, 190, 255, 0.22);
 }
 
-.builder-chart-library::-webkit-scrollbar-track,
+.builder-sidepanel-content::-webkit-scrollbar-track,
 .builder-sidebar-right::-webkit-scrollbar-track,
 .builder-dashboard-canvas::-webkit-scrollbar-track {
   background: transparent;

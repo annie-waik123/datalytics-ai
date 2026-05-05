@@ -37,6 +37,7 @@ import {
   HiOutlineTableCells,
   HiOutlineUsers,
 } from 'react-icons/hi2'
+import CoinAnimation from './components/ui/CoinAnimation';
 
 const ExploreStep = lazy(() => import('./components/ExploreStep.jsx'))
 const VisualizationStep = lazy(() => import('./components/VisualizationStep.jsx'))
@@ -47,6 +48,7 @@ const AIInsightsStep = lazy(() => import('./components/AIInsightsStep.jsx'))
 const DecisionMakingStep = lazy(() => import('./components/DecisionMakingStep.jsx'))
 const UserProfileStep = lazy(() => import('./components/profile/UserProfileStep.jsx'))
 const ChatBot = lazy(() => import('./components/ChatBot.jsx'))
+const AdminPanel = lazy(() => import('./admin/AdminPanel.jsx'))
 
 const DEFAULT_COMPLETED = {
   upload: false,
@@ -165,6 +167,7 @@ function AppShell() {
   const [authChecking, setAuthChecking] = useState(true)
   const [profileAvatar, setProfileAvatar] = useState(null)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [welcomeType, setWelcomeType] = useState('back')
   const welcomeShownRef = useRef(false)
   const { deductDiamonds, InsufficientDiamondsAlert } = useDiamonds()
   const profileVisitKeyRef = useRef(0)
@@ -182,6 +185,7 @@ function AppShell() {
   // Ref to deduplicate per-session activity logs (prevents double-counting on re-renders)
   const loggedActivitiesRef = useRef(new Set())
   const prevDatasetNameRef = useRef(null)
+  const chargedStepsRef = useRef(new Set())
   
   const [step, setStep] = useState('upload')
   const [completedSteps, setCompletedSteps] = useState(DEFAULT_COMPLETED)
@@ -243,6 +247,71 @@ function AppShell() {
     return () => window.removeEventListener('resize', syncViewport)
   }, [])
 
+  const handleLoginSuccess = useCallback(() => {
+    // FORCE reset and show
+    const type = localStorage.getItem('datalytics_welcome_type') || 'back'
+    setWelcomeType(type)
+    
+    // Immediate state change to ensure visibility
+    setShowWelcome(true)
+    localStorage.setItem('datalytics_welcome_shown', 'true')
+    
+    // Auto hide after delay
+    setTimeout(() => {
+      setShowWelcome(false)
+    }, 5000)
+  }, []);
+
+  useEffect(() => {
+    // Check on mount (for page refreshes/initial login redirect)
+    if (localStorage.getItem('datalytics_welcome_shown') === 'false') {
+      handleLoginSuccess()
+    }
+
+    const triggerPopup = () => handleLoginSuccess()
+    window.addEventListener('datalytics:login-success', triggerPopup)
+    return () => window.removeEventListener('datalytics:login-success', triggerPopup)
+  }, [handleLoginSuccess])
+
+  async function chargeStepIfNeeded(stepKey, { force = false } = {}) {
+    if (!stepKey) return true
+    if (!force && (completedSteps[stepKey] || chargedStepsRef.current.has(stepKey))) return true
+
+    const ok = await deductDiamonds(20)
+    if (ok) chargedStepsRef.current.add(stepKey)
+    return ok
+  }
+
+  async function handleStepChange(nextStep) {
+    setQuickPanelOpen(false)
+    if (dataset && (nextStep === 'prediction' || nextStep === 'powerbi')) {
+      const ok = await chargeStepIfNeeded(nextStep)
+      if (!ok) return
+    }
+
+    if (isMobile) {
+      // Close sidebar first, then change step after a short delay
+      setSidebarOpen(false)
+      setTimeout(() => {
+        setStep(nextStep)
+        // Scroll the ds-content area (not window) to top instantly
+        document.querySelector('.ds-content')?.scrollTo({ top: 0, behavior: 'instant' })
+        if (nextStep === 'profile') {
+          profileVisitKeyRef.current += 1
+          setProfileVisitKey(profileVisitKeyRef.current)
+        }
+      }, 120)
+    } else {
+      setStep(nextStep)
+      // Reset content scroll instantly — no jarring smooth scroll animation
+      document.querySelector('.ds-content')?.scrollTo({ top: 0, behavior: 'instant' })
+      if (nextStep === 'profile') {
+        profileVisitKeyRef.current += 1
+        setProfileVisitKey(profileVisitKeyRef.current)
+      }
+    }
+  }
+
   useEffect(() => {
     const token = localStorage.getItem('auth_token')
     if (token) {
@@ -258,8 +327,17 @@ function AppShell() {
           fullName: payload.name || 'Datalytics User', 
           email, 
           role: 'Workspace Member',
-          joinedAt: payload.joined_at
+          joinedAt: payload.joined_at,
+          provider: payload.provider || 'email',
+          plan: payload.plan || 'None',
+          diamonds: payload.diamonds,
         })
+
+        // Check if we should show a welcome toast (for page refreshes)
+        if (localStorage.getItem('datalytics_welcome_shown') === 'false') {
+          handleLoginSuccess()
+        }
+
         // Load avatar keyed by email so it persists after logout
         const avatarKey = `datalytics-profile-avatar-${email}`
         const savedAvatar = localStorage.getItem(avatarKey) || localStorage.getItem('datalytics-profile-avatar')
@@ -277,7 +355,7 @@ function AppShell() {
       }
     }
     setAuthChecking(false)
-  }, [])
+  }, [handleLoginSuccess])
 
   useEffect(() => {
     sidebarHoverPeekRef.current = sidebarHoverPeek
@@ -350,10 +428,8 @@ function AppShell() {
         ...detail,
         requestId: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       })
-      setStep('powerbi')
       setCompletedSteps((prev) => ({ ...prev, powerbi: true }))
       if (isMobile) setSidebarOpen(false)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
 
     window.addEventListener('datalytics:create-dashboard-widget', handleChatWidgetRequest)
@@ -429,33 +505,75 @@ function AppShell() {
     return () => clearTimeout(timer)
   }, [step])
 
+  useEffect(() => {
+    const el = document.querySelector('.ds-content')
+    if (!el) return undefined
 
-  function handleStepChange(nextStep) {
-    setQuickPanelOpen(false)
-    if (isMobile) {
-      // Close sidebar first, then change step after a short delay
-      setSidebarOpen(false)
-      setTimeout(() => {
-        setStep(nextStep)
-        // Scroll the ds-content area (not window) to top instantly
-        document.querySelector('.ds-content')?.scrollTo({ top: 0, behavior: 'instant' })
-        if (nextStep === 'profile') {
-          profileVisitKeyRef.current += 1
-          setProfileVisitKey(profileVisitKeyRef.current)
-        }
-      }, 120)
-    } else {
-      setStep(nextStep)
-      // Reset content scroll instantly — no jarring smooth scroll animation
-      document.querySelector('.ds-content')?.scrollTo({ top: 0, behavior: 'instant' })
-      if (nextStep === 'profile') {
-        profileVisitKeyRef.current += 1
-        setProfileVisitKey(profileVisitKeyRef.current)
-      }
+    const interactiveSelector = 'button, a, input, textarea, select, option, label, summary, details, [role="button"], [contenteditable="true"]'
+    let isDragging = false
+    let startX = 0
+    let startY = 0
+    let startLeft = 0
+    let startTop = 0
+
+    function canScrollHorizontally() {
+      return el.scrollWidth > el.clientWidth + 2
     }
-  }
+
+    function handleWheel(event) {
+      if (!canScrollHorizontally()) return
+      const horizontalIntent = Math.abs(event.deltaX) > Math.abs(event.deltaY)
+      const shiftWheel = event.shiftKey && Math.abs(event.deltaY) > 0
+      if (!horizontalIntent && !shiftWheel) return
+
+      event.preventDefault()
+      el.scrollLeft += horizontalIntent ? event.deltaX : event.deltaY
+    }
+
+    function handleMouseDown(event) {
+      if (event.button !== 0) return
+      if (event.target?.closest?.(interactiveSelector)) return
+      if (!canScrollHorizontally() && el.scrollHeight <= el.clientHeight + 2) return
+
+      isDragging = true
+      startX = event.clientX
+      startY = event.clientY
+      startLeft = el.scrollLeft
+      startTop = el.scrollTop
+      el.classList.add('is-panning')
+    }
+
+    function handleMouseMove(event) {
+      if (!isDragging) return
+      event.preventDefault()
+      el.scrollLeft = startLeft - (event.clientX - startX)
+      el.scrollTop = startTop - (event.clientY - startY)
+    }
+
+    function stopDragging() {
+      if (!isDragging) return
+      isDragging = false
+      el.classList.remove('is-panning')
+    }
+
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    el.addEventListener('mousedown', handleMouseDown)
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', stopDragging)
+    window.addEventListener('mouseleave', stopDragging)
+
+    return () => {
+      el.removeEventListener('wheel', handleWheel)
+      el.removeEventListener('mousedown', handleMouseDown)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', stopDragging)
+      window.removeEventListener('mouseleave', stopDragging)
+      el.classList.remove('is-panning')
+    }
+  }, [step])
 
   function markComplete(stepKey) {
+    chargedStepsRef.current.add(stepKey)
     setCompletedSteps((prev) => ({ ...prev, [stepKey]: true }))
     // Map every pipeline step to its activity category for heatmap + KPI tracking
     // Each step only logs ONCE per session (dedup via loggedActivitiesRef)
@@ -488,6 +606,7 @@ function AppShell() {
     setVizConfig({ chartType: 'Bar', x: '', y: '', filterColumn: '', filterValues: [] })
     setDashboardState(DEFAULT_DASHBOARD_STATE)
     setIncomingWidgetRequest(null)
+    chargedStepsRef.current = normalized ? new Set(['upload']) : new Set()
     setCompletedSteps({ ...DEFAULT_COMPLETED, upload: Boolean(normalized) })
     // Log to MongoDB — once per unique dataset name per session
     if (normalized && normalized.name !== prevDatasetNameRef.current) {
@@ -502,6 +621,9 @@ function AppShell() {
   }
 
   async function handlePreparationContinue(nextDataset, hasChanges) {
+    const ok = await chargeStepIfNeeded('preparation')
+    if (!ok) return
+
     if (hasChanges) {
       const normalized = setDatasetSyncState(normalizeDataset(nextDataset), {
         backendManaged: false,
@@ -565,6 +687,7 @@ function AppShell() {
     setVizConfig({ chartType: 'Bar', x: '', y: '', filterColumn: '', filterValues: [] })
     setDashboardState(DEFAULT_DASHBOARD_STATE)
     setIncomingWidgetRequest(null)
+    chargedStepsRef.current.clear()
     setCompletedSteps(DEFAULT_COMPLETED)
     setStep('upload')
     setSidebarOpen(false)
@@ -655,24 +778,18 @@ function AppShell() {
             {predictionModules.map((mod) => {
               const isActive = predictionModule === mod.key
               const isDone = predictionStatus[predictionStatusMap[mod.key]]
-              // Steps that cost diamonds (initiating training pipelines)
-              const costsDiamonds = !isDone && (mod.key === 'supervised' || mod.key === 'unsupervised')
               return (
                 <button
                   key={mod.key}
                   type="button"
                   className={`pred-subnav-item${isActive ? ' is-active' : ''}${isDone ? ' is-done' : ''}`}
                   onClick={async () => {
-                    if (costsDiamonds) {
-                      const ok = await deductDiamonds(20)
-                      if (!ok) return
-                    }
                     setPredictionModule(mod.key)
                     setPredictionStatus((s) => ({ ...s, current_module: mod.key }))
                   }}
                 >
                   <span className="pred-subnav-step">{mod.icon}</span>
-                  <span className="pred-subnav-label">{mod.label}{costsDiamonds ? ' 🪙' : ''}</span>
+                  <span className="pred-subnav-label">{mod.label}</span>
                   {isDone && <span className="pred-subnav-done-dot" />}
                 </button>
               )
@@ -695,6 +812,7 @@ function AppShell() {
             datasetProfile={datasetProfile}
             onDatasetChange={handleDatasetChange}
             onComplete={markComplete}
+            onBeforeUpload={() => chargeStepIfNeeded('upload', { force: true })}
             onReset={handleResetWorkflow}
           />
         )
@@ -734,6 +852,13 @@ function AppShell() {
                 logActivity('Visualize', 'dashboards', chart?.title || 'Chart saved')
               }}
               onComplete={markComplete}
+              onBeforeVisualize={() => chargeStepIfNeeded('visualization')}
+              onContinueToPrediction={() => {
+                markComplete('visualization')
+                setPredictionModule('preprocessing')
+                setPredictionStatus((current) => ({ ...current, current_module: 'preprocessing' }))
+                handleStepChange('prediction')
+              }}
               onJumpToUpload={() => handleStepChange('upload')}
             />
           </Suspense>
@@ -762,6 +887,7 @@ function AppShell() {
               dataset={dataset}
               datasetProfile={datasetProfile}
               onComplete={markComplete}
+              onBeforeGenerate={() => chargeStepIfNeeded('recommendations')}
               onJumpToUpload={() => handleStepChange('upload')}
             />
           </Suspense>
@@ -773,6 +899,7 @@ function AppShell() {
               dataset={dataset}
               datasetProfile={datasetProfile}
               onComplete={markComplete}
+              onBeforeEvaluate={() => chargeStepIfNeeded('decisionMaking')}
               onJumpToUpload={() => handleStepChange('upload')}
             />
           </Suspense>
@@ -787,6 +914,7 @@ function AppShell() {
               vizConfig={vizConfig}
               savedCharts={savedCharts}
               onComplete={markComplete}
+              onBeforeGenerate={() => chargeStepIfNeeded('reports')}
               onJumpToUpload={() => handleStepChange('upload')}
             />
           </Suspense>
@@ -865,7 +993,14 @@ function AppShell() {
       <AuthSystem 
         onClose={() => {}} // Cannot close until logged in
         onSuccess={(user) => {
-          setAuthProfile({ fullName: user.fullName || 'Datalytics User', email: user.email, role: 'Workspace Member' })
+          setAuthProfile({
+            fullName: user.fullName || 'Datalytics User',
+            email: user.email,
+            role: 'Workspace Member',
+            provider: user.provider || 'email',
+            plan: user.plan || 'None',
+            diamonds: user.diamonds,
+          })
           if (!welcomeShownRef.current) {
             welcomeShownRef.current = true
             setShowWelcome(true)
@@ -873,6 +1008,23 @@ function AppShell() {
           }
         }} 
       />
+    )
+  }
+
+  if (authProfile?.email === 'singhsangam5400@gmail.com') {
+    return (
+      <Suspense fallback={<div className="fixed inset-0 flex items-center justify-center bg-[#050811]"><div className="w-8 h-8 rounded-full border-4 border-t-[#00ffcc] border-[#00ffcc]/20 animate-spin" /></div>}>
+        <AdminPanel 
+          integratedToken={localStorage.getItem('auth_token')} 
+          onIntegratedLogout={() => {
+            localStorage.removeItem('auth_token')
+            localStorage.removeItem('datalytics-notifications')
+            welcomeShownRef.current = false
+            setAuthProfile(null)
+            router.replace('/')
+          }} 
+        />
+      </Suspense>
     )
   }
 
@@ -920,7 +1072,13 @@ function AppShell() {
           onMenuToggle={() => setSidebarOpen((v) => !v)}
           onProfileOpen={() => handleStepChange('profile')}
           onOpenSettings={() => handleStepChange('reports')}
-          onLogout={() => {
+          onLogout={async () => {
+            const token = localStorage.getItem('auth_token')
+            try {
+              if (token) {
+                await fetch('/api/auth/logout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+              }
+            } catch {}
             localStorage.removeItem('auth_token')
             localStorage.removeItem('datalytics-notifications')
             // NOTE: do NOT remove profile avatar — it is keyed by email and must persist
@@ -933,6 +1091,7 @@ function AppShell() {
           profileInitials={profileInitials}
           profileAvatar={profileAvatar}
           showWelcome={showWelcome}
+          welcomeType={welcomeType}
         />
 
         <main className={`ds-content${step === 'prediction' ? ' is-prediction' : ''}`}>

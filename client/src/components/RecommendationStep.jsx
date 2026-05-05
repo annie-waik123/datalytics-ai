@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { generateRecommendationInsights, syncInsightsDataset } from '../api/insights.js'
 import { useToast } from '../hooks/useToast.js'
 import { normalizeRecommendationPayload } from '../utils/chatbotModeParser.js'
+import { saveIndustryPdf } from '../utils/industryPdf.js'
+import CoinAnimation from '../components/ui/CoinAnimation';
 
 const STORAGE_KEY = 'datalytics_ai_insights'
 const RECOMMENDATION_PROMPT = `You are a Senior Data Scientist, Chief Data Officer (CDO), Chief Analytics Officer, and an AI Decision Engine combined into one high-performance intelligence system.
@@ -100,13 +102,13 @@ function SectionFrame({ title, icon, children }) {
   )
 }
 
-function IntelligenceList({ items, renderItem, empty }) {
+function IntelligenceList({ items, renderItem, empty, gridClass = 'insight-grid' }) {
   if (!items?.length) {
     return <div className="insight-summary">{empty}</div>
   }
 
   return (
-    <div className="insight-grid">
+    <div className={gridClass}>
       {items.map((item, index) => (
         <article key={`${index}-${JSON.stringify(item)}`} className="insight-card intelligence-card">
           {renderItem(item)}
@@ -130,7 +132,7 @@ function alertTone(level) {
   return 'warning'
 }
 
-export default function RecommendationStep({ dataset, datasetProfile, onComplete, onJumpToUpload }) {
+export default function RecommendationStep({ dataset, datasetProfile, onComplete, onBeforeGenerate, onJumpToUpload }) {
   const { addToast } = useToast()
   const [loading, setLoading] = useState(false)
   const [intelligence, setIntelligence] = useState(null)
@@ -165,6 +167,9 @@ export default function RecommendationStep({ dataset, datasetProfile, onComplete
 
   async function handleGenerate() {
     if (loading) return
+    const charged = await onBeforeGenerate?.()
+    if (charged === false) return
+
     setLoading(true)
     setError(null)
     setStatusMessage('')
@@ -188,6 +193,38 @@ export default function RecommendationStep({ dataset, datasetProfile, onComplete
     }
   }
 
+  function handleDownloadPdf() {
+    if (!intelligence) {
+      addToast('Generate recommendations first.', null, 'warning')
+      return
+    }
+
+    saveIndustryPdf({
+      title: 'Recommendations Intelligence Report',
+      subtitle: 'Executive recommendations, alerts, forecasts, KPI health, and strategic decisions.',
+      datasetName: dataset?.name,
+      filePrefix: 'Datalytics_Recommendations',
+      metrics: [
+        { label: 'Rows', value: (datasetProfile?.totalRowCount || datasetProfile?.rowCount || 0).toLocaleString() },
+        { label: 'Columns', value: String(datasetProfile?.totalColumnCount || datasetProfile?.columnCount || 0) },
+        { label: 'Insights', value: String(intelligence.insights?.length || 0) },
+        { label: 'Recommendations', value: String(intelligence.recommendations?.length || 0) },
+        { label: 'Alerts', value: String(intelligence.alerts?.length || 0) },
+        { label: 'Decisions', value: String(intelligence.decisions?.length || 0) },
+      ],
+      sections: [
+        { title: 'Executive Summary', body: intelligence.summary || 'No summary available.' },
+        { title: 'AI Insights', items: intelligence.insights?.map((item) => `${item.type || 'Insight'}: ${item.message}`) },
+        { title: 'Actionable Recommendations', items: intelligence.recommendations?.map((item) => `Based on ${item.based_on || 'dataset evidence'}: ${item.action}`) },
+        { title: 'Predictions', items: intelligence.predictions?.map((item) => `${item.metric || 'Metric'} (${item.confidence || 'Confidence unknown'}): ${item.forecast}`) },
+        { title: 'Alerts', items: intelligence.alerts?.map((item) => `${item.level || 'info'}: ${item.message}`) },
+        { title: 'KPI Health', items: intelligence.kpi_status?.map((item) => `${item.metric || 'KPI'}: ${item.status}`) },
+        { title: 'Decision Engine', items: intelligence.decisions?.map((item) => item.suggestion) },
+      ],
+    })
+    onComplete('recommendations')
+  }
+
   return (
     <div className="rec-container">
       <div className="rec-header">
@@ -199,15 +236,18 @@ export default function RecommendationStep({ dataset, datasetProfile, onComplete
           <button className="btn btn-primary" type="button" onClick={handleGenerate} disabled={loading}>
             {loading ? 'Generating...' : intelligence ? 'Regenerate Recommendations' : 'Generate Recommendations'}
           </button>
+          {intelligence && (
+            <button className="btn btn-primary btn-pdf" type="button" onClick={handleDownloadPdf}>
+              Download PDF
+            </button>
+          )}
         </div>
       </div>
 
       {loading ? (
-        <div className="typing-indicator">
-          <span />
-          <span />
-          <span />
-          <span className="typing-label">The backend chatbot is preparing recommendation insights...</span>
+        <div className="flex justify-center items-center py-8 gap-3 text-slate-400">
+          <div className="w-6 h-6 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-sm font-medium">Generating recommendations...</span>
         </div>
       ) : null}
 
@@ -292,11 +332,18 @@ export default function RecommendationStep({ dataset, datasetProfile, onComplete
             <IntelligenceList
               items={intelligence.kpi_status}
               empty="No KPI health statuses were generated."
+              gridClass="kpi-card-grid"
               renderItem={(item) => (
                 <>
                   <div className="intelligence-card-head">
-                    <strong>{item.metric}</strong>
-                    <span className={`intelligence-chip is-${statusTone(item.status)}`}>{item.status}</span>
+                    <strong style={{ color: '#e2e8f0', fontSize: '0.85rem' }}>{item.metric}</strong>
+                  </div>
+                  <div className="insight-body" style={{ fontSize: '0.82rem', lineHeight: 1.6 }}>
+                    {String(item.status || '').split('|').map((part, i) => (
+                      <div key={i} style={{ marginBottom: '3px' }}>
+                        {part.trim()}
+                      </div>
+                    ))}
                   </div>
                 </>
               )}
@@ -371,5 +418,3 @@ function IconDecision() {
     </svg>
   )
 }
-
-

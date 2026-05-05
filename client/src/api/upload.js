@@ -81,3 +81,8 @@ export async function fetchDatasetJson(limit = 5000) {
   })
   return response.data
 }
+
+export async function connectDatabase(credentials) {
+  const response = await client.post('/upload/connect', credentials)
+  return response.data
+}

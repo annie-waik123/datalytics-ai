@@ -332,14 +332,25 @@ def build_dataset_snapshot(df: pd.DataFrame, preview_limit: int = 20, sample_lim
     n_total = len(df)
     columns_info = []
     
+    # Pre-calculate numeric/categorical counts to speed up
+    numeric_df = df.select_dtypes(include=np.number)
+    categorical_df = df.select_dtypes(include=["object", "category", "bool"])
+
     # Fast vectorized null counts and dtypes
     null_counts = df.isnull().sum()
     dtypes = df.dtypes
     
     for col in df.columns:
         null_count = int(null_counts[col])
-        # Use a sample for nunique if the dataframe is large to save time
-        unique_count = int(df[col].nunique()) if n_total < 50_000 else int(df[col].sample(n=10_000, random_state=42).nunique())
+        # Use a smaller sample for nunique if the dataframe is large to save time
+        try:
+            if n_total < 10_000:
+                unique_count = int(df[col].nunique())
+            else:
+                # Sample for performance on large datasets
+                unique_count = int(df[col].sample(n=min(n_total, 10_000), random_state=42).nunique())
+        except Exception:
+            unique_count = 0
         
         columns_info.append({
             "column": str(col),
@@ -353,8 +364,8 @@ def build_dataset_snapshot(df: pd.DataFrame, preview_limit: int = 20, sample_lim
     return sanitize_for_json({
         "rows": n_total,
         "cols": df.shape[1],
-        "numeric_cols": int(df.select_dtypes(include=np.number).shape[1]),
-        "categorical_cols": int(df.select_dtypes(include=["object", "category"]).shape[1]),
+        "numeric_cols": int(numeric_df.shape[1]),
+        "categorical_cols": int(categorical_df.shape[1]),
         "columns_info": columns_info,
         "preview": serialize_dataframe(df, limit=preview_limit),
         "sample_rows": serialize_dataframe(df, limit=sample_limit),
@@ -527,9 +538,10 @@ def preprocess(
     task_type: str,
     missing_strategy: Optional[str],
     encode_method: Optional[str],
-    scaling_method: str,
-    test_size: float,
-    random_state: int,
+    manual_encoding_rules: Optional[List[Any]] = None,
+    scaling_method: str = "None",
+    test_size: float = 0.2,
+    random_state: int = 42,
 ) -> dict:
     """
     Full preprocessing pipeline. Returns a dict with all session-storable objects.
@@ -552,18 +564,6 @@ def preprocess(
         target_col = fallback_target
 
     auto_warnings: List[str] = []
-    recommended_target = _recommend_target_column(df, exclude=[])
-    if (
-        target_col in df.columns
-        and recommended_target
-        and recommended_target != target_col
-        and _is_identifier_like(target_col, df[target_col])
-    ):
-        auto_warnings.append(
-            f"Switched target from {target_col} to {recommended_target} because the selected column looked like an identifier."
-        )
-        target_col = recommended_target
-
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     cat_cols = df.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
     large_dataset_mode = _is_large_dataset(len(df), df.shape[1])
@@ -606,43 +606,72 @@ def preprocess(
 
     target_series = df[target_col]
     if target_series.dropna().empty or target_series.nunique(dropna=True) <= 1:
-        fallback_target = _recommend_target_column(df, exclude=[target_col])
-        if fallback_target and fallback_target != target_col:
-            auto_warnings.append(
-                f"Switched target from {target_col} to {fallback_target} because the original target did not contain enough signal."
-            )
-            target_col = fallback_target
-            target_series = df[target_col]
-        else:
-            raise ValueError("The selected target column does not contain enough usable values.")
+        raise ValueError(f"The selected target column '{target_col}' does not contain enough usable values. Please choose a different column.")
+
+    # Aggressive numeric coercion if user specifically requested Regression
+    # or if the column name implies it should be numeric (e.g. price, milage)
+    if str(task_type) == "Regression" and not pd.api.types.is_numeric_dtype(target_series):
+        # Remove anything that isn't a digit, minus, or period
+        aggressive_clean = target_series.astype(str).str.replace(r'[^\d.-]', '', regex=True)
+        df[target_col] = pd.to_numeric(aggressive_clean, errors="coerce")
+        target_series = df[target_col]
+        auto_warnings.append(f"Target column '{target_col}' was forcefully converted to numeric for Regression. Unparseable text became missing values.")
 
     inferred_task = _infer_task_type_from_target(target_series)
     unique_target_values = int(target_series.astype(str).nunique(dropna=True))
     target_numeric_ratio = float(pd.to_numeric(target_series.dropna(), errors="coerce").notna().mean()) if len(target_series.dropna()) else 0.0
+
+    # Only override task_type if not explicitly set by user
     if str(task_type or "").strip() not in {"Classification", "Regression"}:
         task_type = inferred_task
-    elif task_type != inferred_task and (
-        _is_identifier_like(target_col, target_series)
-        or unique_target_values <= max(12, int(len(df) * 0.2))
-        or target_numeric_ratio < 0.8
-    ):
-        auto_warnings.append(
-            f"Adjusted task type from {task_type} to {inferred_task} to match the selected target column."
-        )
-        task_type = inferred_task
+
+    # Hard validation: regression requires numeric target
     if task_type == "Regression" and target_numeric_ratio < 0.8:
-        auto_warnings.append("Selected regression target was not numeric enough, so the task was switched to Classification.")
+        auto_warnings.append("Regression target was not numeric. Task switched to Classification.")
         task_type = "Classification"
-    elif task_type == "Classification" and unique_target_values > min(40, max(10, int(len(df) * 0.25))) and target_numeric_ratio >= 0.8:
-        auto_warnings.append("Selected classification target had too many unique numeric values, so the task was switched to Regression.")
-        task_type = "Regression"
+
+    # 1.5 Auto-coerce standard numeric features heavily formatted as strings
+    numeric_keywords = {"price", "milage", "mileage", "cost", "salary", "amount", "budget", "revenue", "distance", "weight"}
+    for c in df.select_dtypes(include=["object", "string", "category"]).columns:
+        if c == target_col: continue # already handled above
+        if any(kw in c.lower() for kw in numeric_keywords):
+            aggressive_clean = df[c].astype(str).str.replace(r'[^\d.-]', '', regex=True)
+            if pd.to_numeric(aggressive_clean, errors="coerce").notna().mean() >= 0.7:
+                df[c] = pd.to_numeric(aggressive_clean, errors="coerce")
 
     # 2. Encode categoricals
     label_encoders: Dict[str, LabelEncoder] = {}
     cat_cols_current = df.select_dtypes(include=["object", "category", "bool"]).columns.tolist()
     encoding_warnings: List[str] = []
 
-    if encode_method == "Label Encoding" and cat_cols_current:
+    if encode_method == "Manual" and manual_encoding_rules:
+        for rule in manual_encoding_rules:
+            # handle both pydantic objects and dicts
+            rule_method = rule.method if hasattr(rule, 'method') else rule.get('method')
+            rule_cols = rule.columns if hasattr(rule, 'columns') else rule.get('columns', [])
+            
+            valid_cols = [c for c in rule_cols if c in df.columns]
+            if not valid_cols:
+                continue
+
+            if rule_method == "Label Encoding":
+                for c in valid_cols:
+                    le = LabelEncoder()
+                    df[c] = le.fit_transform(df[c].astype(str))
+                    label_encoders[c] = le
+            elif rule_method == "One-Hot Encoding":
+                # Only OHE columns that are actually categorical
+                ohe_cols = [c for c in valid_cols if c in cat_cols_current and c != target_col]
+                if ohe_cols:
+                    df = pd.get_dummies(df, columns=ohe_cols, drop_first=True, dtype=np.int8)
+        
+        # Finally ensure target is encoded if categorical
+        if target_col in df.columns and str(df[target_col].dtype) in {"object", "bool", "category"}:
+            le = LabelEncoder()
+            df[target_col] = le.fit_transform(df[target_col].astype(str))
+            label_encoders[target_col] = le
+
+    elif encode_method == "Label Encoding" and cat_cols_current:
         for c in cat_cols_current:
             if c not in df.columns:
                 continue

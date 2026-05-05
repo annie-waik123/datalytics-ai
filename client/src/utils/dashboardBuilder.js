@@ -22,6 +22,15 @@ export const FIELD_SLOT_DEFINITIONS = {
 
 export const POWER_BI_CHARTS = [
   {
+    id: 'text_box',
+    label: 'Text Box',
+    iconKey: 'table', // We can reuse the table icon
+    accent: 'slate',
+    description: 'Display custom text or AI insights.',
+    slots: [], // No mapping slots needed
+    defaultSize: { w: 6, h: 4 },
+  },
+  {
     id: 'bar_chart',
     label: 'Bar Chart',
     iconKey: 'bar',

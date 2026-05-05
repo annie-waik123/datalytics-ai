@@ -26,8 +26,8 @@ const NAV_ITEMS = [
   { key: 'powerbi', label: 'Power BI Dashboard', icon: HiOutlineChartBarSquare },
   { key: 'recommendations', label: 'Recommendations', icon: HiOutlineSparkles },
   { key: 'decisionMaking', label: 'Decision Making', icon: HiOutlineLightBulb },
-  { key: 'reports', label: 'Reports', icon: HiOutlineDocumentText },
   { key: 'aiInsights', label: 'AI Insights', icon: HiOutlineChatBubbleLeftRight },
+  { key: 'reports', label: 'Reports', icon: HiOutlineDocumentText },
 ]
 
 const DEFAULT_COMPLETED_FALLBACK = {}
@@ -105,19 +105,83 @@ export default function Sidebar({
 
         <div className="ds-sidebar-head" style={{ paddingTop: '12px' }}>
 
-          <div className="flex items-center gap-3 px-4 py-3 mx-2 rounded-[20px] bg-slate-900/60 border border-white/5 shadow-lg relative overflow-hidden group" style={{ marginTop: '-12px' }}>
-            <div className="flex items-end gap-[4px] h-7 shrink-0 justify-center relative z-10">
-              <div className="w-[6px] h-[55%] rounded-[3px] bg-gradient-to-t from-[#ff4d2e] to-[#ff9d00] shadow-[0_0_10px_rgba(255,157,0,0.4)]" />
-              <div className="w-[6px] h-[100%] rounded-[3px] bg-gradient-to-t from-[#ff4d2e] to-[#ff9d00] shadow-[0_0_10px_rgba(255,157,0,0.4)]" />
-              <div className="w-[6px] h-[75%] rounded-[3px] bg-gradient-to-t from-[#ff4d2e] to-[#ff9d00] shadow-[0_0_10px_rgba(255,157,0,0.4)]" />
+          <a href="/" className={`flex items-center ${compact ? 'justify-center p-2 mx-1 rounded-[16px]' : 'gap-3 px-4 py-3 mx-2 rounded-[20px]'} bg-slate-900/60 border border-white/5 shadow-lg relative overflow-hidden group cursor-pointer hover:bg-slate-800/60 transition-colors`} style={{ marginTop: '-12px', textDecoration: 'none' }}>
+            {/* 3D Logo */}
+            <div style={{
+              position: 'relative',
+              width: '28px',
+              height: '22px',
+              flexShrink: 0,
+              perspective: '120px',
+              display: 'flex',
+              alignItems: 'flex-end',
+              justifyContent: 'center',
+              gap: '3px',
+              zIndex: 10,
+            }}>
+              {/* Ambient glow */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-4px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '26px',
+                height: '6px',
+                background: 'radial-gradient(ellipse, rgba(255,120,30,0.55) 0%, transparent 70%)',
+                filter: 'blur(4px)',
+                borderRadius: '50%',
+                animation: 'logo3dPulse 2.5s ease-in-out infinite',
+              }} />
+              {[{ h: '65%', delay: '0s' }, { h: '100%', delay: '0.15s' }, { h: '80%', delay: '0.3s' }].map((bar, i) => (
+                <div key={i} style={{
+                  position: 'relative',
+                  width: '6px',
+                  height: bar.h,
+                  borderRadius: '2px',
+                  background: 'linear-gradient(180deg, #ffb347 0%, #ff6d00 40%, #cc2800 100%)',
+                  boxShadow: '0 2px 8px rgba(255,100,0,0.5), inset 0 1px 0 rgba(255,255,255,0.35)',
+                  transform: 'rotateX(18deg) rotateY(-6deg) scaleY(1)',
+                  transformStyle: 'preserve-3d',
+                  transformOrigin: 'bottom',
+                  animation: `logo3dWave 1.2s ease-in-out ${i * 0.3}s infinite alternate`,
+                }}>
+                  {/* Top highlight */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0,
+                    height: '40%',
+                    background: 'linear-gradient(180deg, rgba(255,255,255,0.45) 0%, transparent 100%)',
+                    borderRadius: '3px 3px 0 0',
+                  }} />
+                  {/* Right-edge shadow */}
+                  <div style={{
+                    position: 'absolute',
+                    top: 0, right: 0,
+                    width: '30%',
+                    height: '100%',
+                    background: 'linear-gradient(270deg, rgba(0,0,0,0.35) 0%, transparent 100%)',
+                    borderRadius: '0 3px 3px 0',
+                  }} />
+                </div>
+              ))}
+              <style>{`
+                @keyframes logo3dWave {
+                  0% { transform: rotateX(18deg) rotateY(-6deg) scaleY(1); }
+                  100% { transform: rotateX(18deg) rotateY(-6deg) scaleY(0.3); }
+                }
+                @keyframes logo3dPulse {
+                  0%, 100% { opacity: 0.5; transform: translateX(-50%) scaleX(1); }
+                  50% { opacity: 0.9; transform: translateX(-50%) scaleX(1.2); }
+                }
+              `}</style>
             </div>
             {!compact ? (
-              <span className="text-[24px] font-black tracking-[-0.03em] text-white drop-shadow-sm ml-1 relative z-10">
+              <span className="text-[20px] font-black tracking-[-0.03em] text-white drop-shadow-sm ml-1 relative z-10">
                 Datalytics
               </span>
             ) : null}
             <div className="absolute inset-0 bg-gradient-to-br from-orange-400/5 to-transparent opacity-0 group-hover:opacity-100 transition duration-500" />
-          </div>
+          </a>
 
         </div>
 
@@ -223,7 +287,7 @@ export default function Sidebar({
           <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-[20px] border border-cyan-400/20 bg-[#0f172a] shadow-[0_0_50px_rgba(0,198,255,0.15)] overflow-hidden">
             {/* MacOS Window Controls Header */}
             <div className="flex z-50 items-center justify-end px-5 py-3.5 bg-white/[0.02] border-b border-white/5 relative">
-              <div className="absolute left-1/2 -translate-x-1/2 text-xs font-semibold text-slate-400 tracking-wide">About Datalytics AI</div>
+              <div className="absolute left-1/2 -translate-x-1/2 text-xs font-semibold text-slate-400 tracking-wide">About Eighteen AI</div>
               <button 
                 type="button" 
                 onClick={() => setShowAbout(false)} 
@@ -235,10 +299,62 @@ export default function Sidebar({
             {/* Scrollable Content */}
             <div className="p-8 overflow-hidden relative">
               <div className="flex items-center gap-5 mb-8 relative z-10">
-                <div className="flex items-end gap-[6px] h-[60px] w-[60px] shrink-0 justify-center border border-white/5 bg-white/5 rounded-2xl p-3 shadow-inner">
-                  <div className="w-2 h-[60%] rounded-full bg-gradient-to-t from-[#ff4d2e] to-[#ff9d00]" />
-                  <div className="w-2 h-[100%] rounded-full bg-gradient-to-t from-[#ff4d2e] to-[#ff9d00]" />
-                  <div className="w-2 h-[80%] rounded-full bg-gradient-to-t from-[#ff4d2e] to-[#ff9d00]" />
+                {/* 3D Logo — About Modal (large) */}
+                <div style={{
+                  position: 'relative',
+                  width: '60px',
+                  height: '60px',
+                  flexShrink: 0,
+                  perspective: '200px',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  padding: '10px',
+                  background: 'rgba(255,255,255,0.04)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '16px',
+                  boxShadow: '0 0 30px rgba(255,100,0,0.15), inset 0 1px 0 rgba(255,255,255,0.05)',
+                }}>
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '6px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: '44px',
+                    height: '10px',
+                    background: 'radial-gradient(ellipse, rgba(255,120,30,0.6) 0%, transparent 70%)',
+                    filter: 'blur(5px)',
+                    borderRadius: '50%',
+                    animation: 'logo3dPulse 2.5s ease-in-out infinite',
+                  }} />
+                  {[{ h: '65%', delay: '0s' }, { h: '100%', delay: '0.15s' }, { h: '80%', delay: '0.3s' }].map((bar, i) => (
+                    <div key={i} style={{
+                      position: 'relative',
+                      width: '10px',
+                      height: bar.h,
+                      borderRadius: '4px',
+                      background: 'linear-gradient(180deg, #ffb347 0%, #ff6d00 40%, #cc2800 100%)',
+                      boxShadow: '0 3px 12px rgba(255,100,0,0.6), inset 0 1px 0 rgba(255,255,255,0.35)',
+                      transform: 'rotateX(18deg) rotateY(-6deg) scaleY(1)',
+                      transformStyle: 'preserve-3d',
+                      transformOrigin: 'bottom',
+                      animation: `logo3dWave 1.2s ease-in-out ${i * 0.3}s infinite alternate`,
+                    }}>
+                      <div style={{
+                        position: 'absolute', top: 0, left: 0, right: 0,
+                        height: '40%',
+                        background: 'linear-gradient(180deg, rgba(255,255,255,0.45) 0%, transparent 100%)',
+                        borderRadius: '4px 4px 0 0',
+                      }} />
+                      <div style={{
+                        position: 'absolute', top: 0, right: 0,
+                        width: '30%', height: '100%',
+                        background: 'linear-gradient(270deg, rgba(0,0,0,0.35) 0%, transparent 100%)',
+                        borderRadius: '0 4px 4px 0',
+                      }} />
+                    </div>
+                  ))}
                 </div>
                 <div>
                   <h2 className="text-4xl font-bold text-white tracking-tight">Datalytics <span className="text-cyan-400 font-normal">AI</span></h2>
@@ -248,7 +364,7 @@ export default function Sidebar({
 
               <div className="space-y-6 relative z-10">
                 <p className="text-slate-300 leading-relaxed text-lg">
-                  Welcome to Datalytics AI, the next-generation autonomous analytics operating system. 
+                  Welcome to Eighteen AI, the next-generation autonomous analytics operating system. 
                   Designed for data scientists, product managers, and founders to rapidly ingest, profile, query, and visualize big data interactively without context-switching.
                 </p>
 

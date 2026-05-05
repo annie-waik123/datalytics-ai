@@ -32,6 +32,7 @@ export default function Navbar({
   profileInitials,
   profileAvatar,
   showWelcome = false,
+  welcomeType = 'back',
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -178,7 +179,7 @@ export default function Navbar({
         aria-live="polite"
         style={{
           position: 'fixed',
-          top: '1.1rem',
+          top: '4.5rem',
           right: '1.5rem',
           zIndex: 99999,
           display: 'flex',
@@ -195,7 +196,9 @@ export default function Navbar({
           fontWeight: 600,
           color: '#e2f8f0',
           letterSpacing: '0.01em',
-          whiteSpace: 'nowrap',
+          whiteSpace: 'normal',
+          maxWidth: 'calc(100vw - 2rem)',
+          lineHeight: 1.35,
           pointerEvents: 'none',
           transition: 'opacity 0.45s cubic-bezier(0.4,0,0.2,1), transform 0.45s cubic-bezier(0.4,0,0.2,1)',
           opacity: showWelcome ? 1 : 0,
@@ -217,7 +220,11 @@ export default function Navbar({
             <path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <span>Welcome back, <span style={{ color: '#4fffbe' }}>{(profileName || '').split(' ')[0]}</span>!</span>
+        {welcomeType === 'new' ? (
+          <span>Welcome, <span style={{ color: '#4fffbe' }}>{(profileName || '').split(' ')[0]}</span>! 🎉 Your account is ready!</span>
+        ) : (
+          <span>Welcome back, <span style={{ color: '#4fffbe' }}>{(profileName || '').split(' ')[0]}</span>! Your workspace is ready.</span>
+        )}
       </div>
 
       <header className="ds-navbar">
@@ -274,25 +281,13 @@ export default function Navbar({
               }}
               title="View Profile"
             >
-              <span className="ds-navbar-avatar overflow-hidden shadow-[0_0_10px_rgba(0,198,255,0.4)] border border-cyan-400/30">
+              <span className="ds-navbar-avatar overflow-hidden">
                  {profileAvatar ? <img src={profileAvatar} alt="Avatar" className="w-full h-full object-cover" /> : profileInitials}
               </span>
               <span className="ds-navbar-profile-copy">
                 <strong className="text-white drop-shadow-sm">{profileName}</strong>
                 <small className="text-cyan-300/80">{profileRole}</small>
               </span>
-            </button>
-            
-            <button 
-              type="button" 
-              className="p-1.5 ml-1 rounded-md text-slate-400 hover:text-cyan-300 hover:bg-cyan-400/10 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen((open) => !open);
-              }}
-              title="View Profile Menu"
-            >
-              <HiOutlineChevronDown />
             </button>
 
             {menuOpen && (

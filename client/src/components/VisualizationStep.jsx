@@ -7,6 +7,7 @@ import {
   syncVisualizationDataset,
 } from '../api/visualization.js'
 import { useToast } from '../hooks/useToast.js'
+import CustomDropdown from './ui/CustomDropdown.jsx';
 
 const THEME_KEY = 'datalytics_visualization_theme'
 
@@ -303,16 +304,16 @@ function VisualizationCard({
     return (
       <label className="viz-field">
         <span>{label}</span>
-        <select
+        <CustomDropdown
           value={value || ''}
-          onChange={(event) => onFieldChange(field, event.target.value)}
+          onChange={(val) => onFieldChange(field, val)}
           disabled={disabled || !values?.length}
         >
           {!values?.length ? <option value="">No compatible columns</option> : null}
           {values?.map((option) => (
             <option key={option} value={option}>{option}</option>
           ))}
-        </select>
+        </CustomDropdown>
       </label>
     )
   }
@@ -407,6 +408,8 @@ export default function VisualizationStep({
   setVizConfig,
   onAddChart,
   onComplete,
+  onBeforeVisualize,
+  onContinueToPrediction,
   onJumpToUpload,
 }) {
   const { addToast } = useToast()
@@ -566,6 +569,14 @@ export default function VisualizationStep({
       setSyncing(true)
       setSyncError('')
       try {
+        const charged = await onBeforeVisualize?.()
+        if (ignore) return
+        if (charged === false) {
+          setSyncError('Not enough UC to generate visualizations.')
+          setSyncing(false)
+          return
+        }
+
         const payload = await syncVisualizationDataset(dataset)
         if (ignore) return
         const nextMetadata = payload.metadata || (await fetchVisualizationMetadata())
@@ -718,7 +729,7 @@ export default function VisualizationStep({
           <p className="page-subtitle">Auto-generate a rich suite of statistical and distribution charts from your dataset.</p>
         </div>
         <div className="header-actions">
-          <button type="button" className="btn btn-primary" onClick={onComplete} disabled={syncing}>
+          <button type="button" className="btn btn-primary" onClick={onContinueToPrediction} disabled={syncing}>
             Continue to Prediction
           </button>
         </div>
@@ -788,33 +799,33 @@ export default function VisualizationStep({
                       {chart.mode === 'single' && (
                         <div className="viz-field-inline">
                           <span>Select Column</span>
-                          <select 
+                          <CustomDropdown 
                             value={config.column || ''} 
-                            onChange={(e) => handleFieldChange(chart.id, 'column', e.target.value)}
+                            onChange={(val) => handleFieldChange(chart.id, 'column', val)}
                           >
                             {(options.single || []).map(c => <option key={c} value={c} style={{ background: '#121a2a', color: '#fff' }}>{c}</option>)}
-                          </select>
+                          </CustomDropdown>
                         </div>
                       )}
                       {(chart.mode === 'double' || chart.mode === 'time') && (
                         <>
                           <div className="viz-field-inline">
                             <span>{chart.mode === 'time' ? 'Date' : 'X Axis'}</span>
-                            <select 
+                            <CustomDropdown 
                               value={chart.mode === 'time' ? (config.date_column || '') : (config.x_column || '')} 
-                              onChange={(e) => handleFieldChange(chart.id, chart.mode === 'time' ? 'date_column' : 'x_column', e.target.value)}
+                              onChange={(val) => handleFieldChange(chart.id, chart.mode === 'time' ? 'date_column' : 'x_column', val)}
                             >
                               {((chart.mode === 'time' ? options.date : options.x) || []).map(c => <option key={c} value={c} style={{ background: '#121a2a', color: '#fff' }}>{c}</option>)}
-                            </select>
+                            </CustomDropdown>
                           </div>
                           <div className="viz-field-inline">
                             <span>{chart.mode === 'time' ? 'Value' : 'Y Axis'}</span>
-                            <select 
+                            <CustomDropdown 
                               value={chart.mode === 'time' ? (config.value_column || '') : (config.y_column || '')} 
-                              onChange={(e) => handleFieldChange(chart.id, chart.mode === 'time' ? 'value_column' : 'y_column', e.target.value)}
+                              onChange={(val) => handleFieldChange(chart.id, chart.mode === 'time' ? 'value_column' : 'y_column', val)}
                             >
                               {((chart.mode === 'time' ? options.value : options.y) || []).map(c => <option key={c} value={c} style={{ background: '#121a2a', color: '#fff' }}>{c}</option>)}
-                            </select>
+                            </CustomDropdown>
                           </div>
                         </>
                       )}

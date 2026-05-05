@@ -1,14 +1,14 @@
 'use client'
 
 import dynamic from 'next/dynamic'
-import AnalyticsPipelineStepper from '../../src/components/AnalyticsPipelineStepper.jsx'
+import LogoLoadingAnimation from '../../src/components/LogoLoadingAnimation.jsx'
 // import { useRouter } from 'next/navigation'
 // import { useEffect } from 'react'
 // import { useAuth } from '../../src/auth/AuthContext.jsx'
 
 const DashboardApp = dynamic(() => import('../../src/App.jsx'), {
   ssr: false,
-  loading: () => <AnalyticsPipelineStepper theme="dark" stepDuration={1050} />,
+  loading: () => <LogoLoadingAnimation />,
 })
 
 export default function DashboardPage() {

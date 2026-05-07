@@ -1,0 +1,23 @@
+services:
+  # ── BACKEND (FastAPI) ───────────────────────────────────────
+  - type: web
+    name: datalytics-backend
+    runtime: python
+    rootDir: server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+    healthCheckPath: /api/health
+
+  # ── FRONTEND (Next.js) ─────────────────────────────────────
+  - type: web
+    name: datalytics-frontend
+    runtime: node
+    rootDir: client
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.0.0

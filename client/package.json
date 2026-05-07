@@ -7,7 +7,7 @@
     "dev": "next dev -p 5000 -H localhost",
     "prebuild": "node --input-type=commonjs -e \"require('fs').rmSync('.next', { recursive: true, force: true })\"",
     "build": "next build",
-    "start": "next start -p 5000 -H localhost"
+    "start": "next start -p ${PORT:-5000} -H 0.0.0.0"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.5",

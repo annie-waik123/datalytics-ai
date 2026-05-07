@@ -119,10 +119,119 @@ const styles = `
   .dropdown-contact-icon { font-size: 1.1rem; }
 
   .nav-actions { display: flex; align-items: center; gap: 1rem; }
-  .btn-login { color: rgba(255,255,255,0.78); background: none; border: none; font-family: inherit; font-size: 0.9rem; font-weight: 500; cursor: pointer; transition: color 0.25s; }
-  .btn-login:hover { color: #fff; }
-  .btn-signup { background: linear-gradient(135deg, var(--red), var(--orange)); color: #fff; border: none; padding: 9px 22px; border-radius: 10px; font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 0 20px rgba(255,77,46,0.4); }
-  .btn-signup:hover { transform: translateY(-2px); box-shadow: 0 0 35px rgba(255,77,46,0.7); }
+
+  /* ── PREMIUM LOGIN BUTTON ── */
+  .btn-login {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255,255,255,0.82);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 9px 22px;
+    border-radius: 50px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+  }
+  .btn-login::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255,106,0,0.5), rgba(255,77,46,0.5), rgba(255,157,0,0.3));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn-login:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.09);
+    border-color: rgba(255,106,0,0.45);
+    box-shadow: 0 0 18px rgba(255,106,0,0.18), 0 4px 16px rgba(0,0,0,0.3);
+    transform: translateY(-1px);
+  }
+  .btn-login:hover::before { opacity: 1; }
+  .btn-login-icon {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(255,106,0,0.3), rgba(255,77,46,0.3));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem;
+    transition: transform 0.3s;
+  }
+  .btn-login:hover .btn-login-icon { transform: scale(1.15) rotate(5deg); }
+
+  /* ── PREMIUM START ANALYZING BUTTON ── */
+  .btn-signup {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #ff4d2e 0%, #ff6a00 50%, #ff9d00 100%);
+    color: #fff;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 50px;
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    box-shadow: 0 0 22px rgba(255,77,46,0.45), 0 4px 16px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+  }
+  .btn-signup::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+    transform: skewX(-20deg);
+    animation: btnShimmer 2.8s ease-in-out infinite;
+  }
+  @keyframes btnShimmer {
+    0% { left: -100%; }
+    60%, 100% { left: 160%; }
+  }
+  .btn-signup::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50px;
+    background: linear-gradient(135deg, #ff5e40 0%, #ff7a1a 50%, #ffb020 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .btn-signup:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 0 40px rgba(255,77,46,0.75), 0 8px 25px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+  }
+  .btn-signup:hover::after { opacity: 1; }
+  .btn-signup > * { position: relative; z-index: 1; }
+  .btn-signup-pulse {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 6px rgba(255,255,255,0.9);
+    animation: pulseDot 1.6s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.5); opacity: 0.7; }
+  }
 
   /* HAMBURGER */
   .hamburger { display: none; flex-direction: column; gap: 5px; background: none; border: none; cursor: pointer; padding: 5px; z-index: 1001; }
@@ -1385,9 +1494,16 @@ function Navbar({ scrolled, onLaunch, onLogin }) {
         ))}
       </ul>
       <div className="nav-actions">
-        <button className="btn-login" onClick={onLogin}>Login</button>
+        <button className="btn-login" onClick={onLogin}>
+          <span className="btn-login-icon">👤</span>
+          Login
+        </button>
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-          <button className="btn-signup" onClick={onLaunch}>Start Analyzing 🚀</button>
+          <button className="btn-signup" onClick={onLaunch}>
+            <span className="btn-signup-pulse" />
+            Start Analyzing
+            <span style={{ fontSize: '1rem' }}>🚀</span>
+          </button>
           <div className="zoom-typing-text">
             ⚡ For the best experience, set your browser zoom to 80%
           </div>
@@ -1406,8 +1522,14 @@ function Navbar({ scrolled, onLaunch, onLogin }) {
           ))}
         </ul>
         <div className="mobile-nav-actions">
-          <button className="btn-login" onClick={() => { onLogin(); setMobileMenuOpen(false); }}>Login</button>
-          <button className="btn-signup" onClick={() => { onLaunch(); setMobileMenuOpen(false); }}>Start Analyzing 🚀</button>
+          <button className="btn-login" onClick={() => { onLogin(); setMobileMenuOpen(false); }}>
+            <span className="btn-login-icon">👤</span>
+            Login
+          </button>
+          <button className="btn-signup" onClick={() => { onLaunch(); setMobileMenuOpen(false); }}>
+            <span className="btn-signup-pulse" />
+            Start Analyzing 🚀
+          </button>
         </div>
       </div>
     </nav>

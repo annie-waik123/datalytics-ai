@@ -1,4 +1,4 @@
-﻿import os
+import os
 import random
 import smtplib
 import ssl
@@ -32,7 +32,7 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "").strip()
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "datalyticsofficial@gmail.com")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "mxfnibjofpmxghpp")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "unpvpamnvadvbxhn")
 
 class SignupRequest(BaseModel):
     fullName: str

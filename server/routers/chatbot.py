@@ -17,6 +17,8 @@ import re
 from typing import Optional
 
 # Force-load .env so GROQ_API_KEY is always available
+
+# Force-load .env so GROQ_API_KEY is always available
 from dotenv import load_dotenv
 _ENV = pathlib.Path(__file__).parent.parent / ".env"
 load_dotenv(dotenv_path=_ENV, override=True)
@@ -25,14 +27,14 @@ from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from database import get_chat_history, get_dataset, save_chat_message
-from services.data_engine_service import has_live_dataset, restore_live_dataset
-from services.insight_generation_service import (
+from app.core.database import get_chat_history, get_dataset, save_chat_message
+from app.services.data_engine_service import has_live_dataset, restore_live_dataset
+from app.services.insight_generation_service import (
     generate_mode_response_from_session,
     infer_mode_from_prompt,
 )
-from services.llm_service import get_active_llm_summary, groq_chat, has_groq_config
-from state.session_store import store
+from app.services.llm_service import get_active_llm_summary, groq_chat, has_groq_config
+from app.state.session_store import store
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -1236,7 +1238,7 @@ async def clear_chat(
     x_session_id: str = Header(..., alias="X-Session-ID"),
 ):
     try:
-        from database import get_db
+        from app.core.database import get_db
         db = get_db()
         await db["chats"].delete_many({"session_id": x_session_id})
     except Exception as exc:

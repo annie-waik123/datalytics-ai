@@ -13,6 +13,7 @@ const navItems = [
   { key: 'users', label: 'Users', icon: 'users' },
   { key: 'payments', label: 'Payments', icon: 'card' },
   { key: 'emails', label: 'Emails', icon: 'email' },
+  { key: 'aifeatures', label: 'AI Features', icon: 'lock' },
   { key: 'activity', label: 'Activity Logs', icon: 'activity' },
   { key: 'authLogs', label: 'Login / Logout', icon: 'login' },
 ]
@@ -869,7 +870,130 @@ function EmailsPage({ users, token }) {
   )
 }
 
+function AIFeaturesPage({ features, onSave, saving, message }) {
+  const [local, setLocal] = useState(features)
+
+  useEffect(() => {
+    setLocal(features)
+  }, [features])
+
+  const FEATURE_CONFIG = [
+    {
+      key: 'chatbot',
+      label: 'AI Chatbot',
+      desc: 'Allows users to chat with the AI assistant powered by OpenAI/Groq. When OFF, all chatbot API calls are blocked.',
+      icon: '🤖',
+    },
+    {
+      key: 'recommendations',
+      label: 'Recommendations & Insights',
+      desc: 'AI-generated dataset recommendations and smart insights. When OFF, users see a disabled message.',
+      icon: '💡',
+    },
+    {
+      key: 'decision_making',
+      label: 'Decision Making',
+      desc: 'AI-powered decision support and scenario analysis. When OFF, the feature is blocked for all users.',
+      icon: '🎯',
+    },
+    {
+      key: 'ai_insights',
+      label: 'AI Insights',
+      desc: 'Automatic LLM-generated data insights and summaries. When OFF, no OpenAI calls are made.',
+      icon: '✨',
+    },
+  ]
+
+  return (
+    <div className="admin-page">
+      <div className="admin-page-head">
+        <div>
+          <p className="admin-eyebrow">AI Control Panel</p>
+          <h2>AI Feature Kill Switch</h2>
+          <p className="admin-muted" style={{ marginTop: 4 }}>Toggle AI-powered features ON or OFF globally. When a feature is OFF, all related OpenAI API calls are blocked and users see a "feature disabled" message.</p>
+        </div>
+      </div>
+
+      <div className="admin-panel-card" style={{ maxWidth: 680 }}>
+        {FEATURE_CONFIG.map(({ key, label, desc, icon }) => (
+          <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <span style={{ fontSize: 26 }}>{icon}</span>
+              <div>
+                <strong style={{ color: '#fff', display: 'block', marginBottom: 4 }}>{label}</strong>
+                <span className="admin-muted" style={{ fontSize: 12 }}>{desc}</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocal(prev => ({ ...prev, [key]: !prev[key] }))}
+              style={{
+                flexShrink: 0,
+                marginLeft: 24,
+                width: 52,
+                height: 28,
+                borderRadius: 14,
+                border: 'none',
+                cursor: 'pointer',
+                background: local[key] ? '#22c55e' : '#475569',
+                position: 'relative',
+                transition: 'background 0.2s',
+              }}
+              title={local[key] ? 'Click to disable' : 'Click to enable'}
+            >
+              <span style={{
+                position: 'absolute',
+                top: 3,
+                left: local[key] ? 26 : 3,
+                width: 22,
+                height: 22,
+                borderRadius: '50%',
+                background: '#fff',
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+              }} />
+            </button>
+          </div>
+        ))}
+
+        <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => onSave(local)}
+            disabled={saving}
+            style={{
+              background: 'linear-gradient(135deg, #f97316, #ea580c)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 10,
+              padding: '10px 28px',
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.7 : 1,
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Settings'}
+          </button>
+          {message && (
+            <span style={{ fontSize: 13, color: message.startsWith('✅') ? '#22c55e' : '#f87171' }}>
+              {message}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="admin-panel-card" style={{ maxWidth: 680, marginTop: 16, background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.2)' }}>
+        <h3 style={{ color: '#f97316', marginBottom: 8 }}>⚠️ How This Works</h3>
+        <p className="admin-muted" style={{ fontSize: 13, lineHeight: 1.6 }}>
+          When you toggle a feature OFF and save, the backend stores this flag in MongoDB. Every API call for that feature checks this flag first — if disabled, it immediately returns a <code style={{ color: '#fb923c' }}>503</code> error with the message <em>"This feature is currently disabled by the administrator."</em> Users will see this message in the UI instead of the AI response.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function ActivityLogsPage({ logs, loading }) {
+
   const [query, setQuery] = useState('')
   const loginCount = (logs || []).filter((log) => log.action === 'Login').length
   const logoutCount = (logs || []).filter((log) => log.action === 'Logout').length
@@ -1048,6 +1172,9 @@ export default function AdminPanel({ integratedToken, onIntegratedLogout }) {
   const [authLogs, setAuthLogs] = useState([])
   const [selectedUser, setSelectedUser] = useState(null)
   const [editingProfile, setEditingProfile] = useState(false)
+  const [aiFeatures, setAiFeatures] = useState({ chatbot: true, recommendations: true, decision_making: true, ai_insights: true })
+  const [aiSaving, setAiSaving] = useState(false)
+  const [aiMessage, setAiMessage] = useState('')
 
   async function authed(path, options = {}) {
     return apiRequest(path, { ...options, token })
@@ -1058,13 +1185,14 @@ export default function AdminPanel({ integratedToken, onIntegratedLogout }) {
     setLoading(true)
     setError('')
     try {
-      const [me, analyticsData, usersData, paymentData, activityData, authData] = await Promise.all([
+      const [me, analyticsData, usersData, paymentData, activityData, authData, aiFeaturesData] = await Promise.all([
         apiRequest('/admin/me', { token: nextToken }),
         apiRequest('/admin/analytics', { token: nextToken }),
         apiRequest('/admin/users', { token: nextToken }),
         apiRequest('/admin/payments', { token: nextToken }),
         apiRequest('/admin/activity-logs', { token: nextToken }),
         apiRequest('/admin/auth-logs', { token: nextToken }),
+        apiRequest('/admin/ai-features', { token: nextToken }),
       ])
       setAdmin(me.admin)
       setAnalytics(analyticsData)
@@ -1072,6 +1200,7 @@ export default function AdminPanel({ integratedToken, onIntegratedLogout }) {
       setPayments(paymentData)
       setActivityLogs(activityData.logs || [])
       setAuthLogs(authData.logs || [])
+      if (aiFeaturesData?.features) setAiFeatures(aiFeaturesData.features)
     } catch (err) {
       setError(err.message)
       if (String(err.message).toLowerCase().includes('token')) {
@@ -1113,8 +1242,12 @@ export default function AdminPanel({ integratedToken, onIntegratedLogout }) {
   }
 
   async function updateUserStatus(id, status) {
-    await authed(`/admin/users/${id}/status`, { method: 'PATCH', body: { status } })
-    await loadAll()
+    try {
+      await authed(`/admin/users/${id}/status`, { method: 'PATCH', body: { status } })
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status } : u))
+    } catch (err) {
+      alert(`Failed to update status: ${err.message}`)
+    }
   }
   async function updateUserRole(id, role) {
     await authed(`/admin/users/${id}/role`, { method: 'PATCH', body: { role } })
@@ -1165,6 +1298,21 @@ export default function AdminPanel({ integratedToken, onIntegratedLogout }) {
     await loadAll()
   }
 
+  async function saveAiFeatures(features) {
+    setAiSaving(true)
+    setAiMessage('')
+    try {
+      await authed('/admin/ai-features', { method: 'PUT', body: features })
+      setAiFeatures(features)
+      setAiMessage('✅ AI feature settings saved successfully!')
+      setTimeout(() => setAiMessage(''), 4000)
+    } catch (err) {
+      setAiMessage(`❌ Failed to save: ${err.message}`)
+    } finally {
+      setAiSaving(false)
+    }
+  }
+
   const adminInitials = (admin?.name || admin?.email || 'DL').split(/\s|@/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 
   return (
@@ -1189,6 +1337,7 @@ export default function AdminPanel({ integratedToken, onIntegratedLogout }) {
         {active === 'users' ? <UsersPage users={users} onStatus={updateUserStatus} onRole={updateUserRole} onDelete={deleteUser} onViewUser={handleViewUser} /> : null}
         {active === 'payments' ? <PaymentsPage payments={payments} onCreatePlan={createPlan} onUpdatePlan={updatePlan} onDeletePlan={deletePlan} /> : null}
         {active === 'emails' ? <EmailsPage users={users} token={token} /> : null}
+        {active === 'aifeatures' ? <AIFeaturesPage features={aiFeatures} onSave={saveAiFeatures} saving={aiSaving} message={aiMessage} /> : null}
         {active === 'activity' ? <ActivityLogsPage logs={activityLogs} loading={loading} /> : null}
         {active === 'authLogs' ? <AuthLogsPage logs={authLogs} loading={loading} /> : null}
       </main>

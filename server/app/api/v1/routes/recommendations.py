@@ -1,4 +1,4 @@
-﻿"""
+"""
 Recommendations router with optional AI generation support.
 """
 from __future__ import annotations
@@ -27,6 +27,8 @@ from app.services.recommendation_service import (
 )
 
 router = APIRouter()
+
+from app.core.ai_feature_flags import require_ai_feature
 
 
 class InsightGenerateRequest(BaseModel):
@@ -159,6 +161,7 @@ async def recommendations_generate(
     body: InsightGenerateRequest,
     x_session_id: str = Header(..., alias="X-Session-ID"),
 ):
+    await require_ai_feature("recommendations")
     session = store.get(x_session_id)
     try:
         result = _build_response(
@@ -205,6 +208,7 @@ async def ai_insights_generate(
     body: InsightGenerateRequest,
     x_session_id: str = Header(..., alias="X-Session-ID"),
 ):
+    await require_ai_feature("ai_insights")
     session = store.get(x_session_id)
     try:
         result = _build_response(

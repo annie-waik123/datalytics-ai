@@ -76,6 +76,13 @@ class AdminProfileRequest(BaseModel):
     avatar_url: str = ""
 
 
+class AIFeaturesRequest(BaseModel):
+    chatbot: bool = True
+    recommendations: bool = True
+    decision_making: bool = True
+    ai_insights: bool = True
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -659,7 +666,46 @@ async def admin_send_emails(req: AdminEmailRequest, background_tasks: Background
     """
     html_content = html_template.replace("{{subject}}", subject).replace("{{body}}", body)
 
+    sent = 0
     for email in emails:
-        background_tasks.add_task(send_email, email, req.subject.strip(), html_content)
-        
-    return {"ok": True, "count": len(emails)}
+        try:
+            background_tasks.add_task(send_email, email, req.subject.strip(), html_content)
+            sent += 1
+        except Exception as e:
+            print(f"[EMAIL] Failed to queue for {email}: {e}")
+
+    return {"ok": True, "count": sent}
+
+
+# ── AI Feature Kill Switch ─────────────────────────────────────────────────────
+
+DEFAULT_AI_FEATURES = {
+    "chatbot": True,
+    "recommendations": True,
+    "decision_making": True,
+    "ai_insights": True,
+}
+
+
+@router.get("/admin/ai-features")
+async def get_ai_features():
+    """Get current AI feature flags (public — used by frontend to check if features are enabled)."""
+    db = get_db()
+    doc = await db.admin_settings.find_one({"_id": "ai_features"})
+    if not doc:
+        return {"features": DEFAULT_AI_FEATURES}
+    flags = {k: doc.get(k, True) for k in DEFAULT_AI_FEATURES}
+    return {"features": flags}
+
+
+@router.put("/admin/ai-features")
+async def update_ai_features(req: AIFeaturesRequest, _: dict[str, Any] = Depends(require_admin)):
+    """Update AI feature kill-switch toggles (admin only)."""
+    db = get_db()
+    flags = req.model_dump()
+    await db.admin_settings.update_one(
+        {"_id": "ai_features"},
+        {"$set": {**flags, "updated_at": datetime.utcnow()}},
+        upsert=True,
+    )
+    return {"ok": True, "features": flags}

@@ -1503,6 +1503,7 @@ export default function UserProfileStep({
                                localStorage.setItem(`datalytics-profile-avatar-${email}`, base64)
                              }
                              localStorage.setItem('datalytics-profile-avatar', base64)
+                              window.dispatchEvent(new CustomEvent('datalytics:avatar-updated', { detail: { avatar: base64 } }))
                            } catch (err) {
                              console.error('Failed to save avatar', err)
                              alert('Failed to save image. Storage limit exceeded.')

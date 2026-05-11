@@ -357,16 +357,6 @@ function AppShell() {
     setAuthChecking(false)
   }, [handleLoginSuccess])
 
-  // ── Sync avatar when UserProfileStep updates it ──────────────────────────────
-  useEffect(() => {
-    function handleAvatarUpdate(event) {
-      const { avatar } = event.detail || {}
-      if (avatar) setProfileAvatar(avatar)
-    }
-    window.addEventListener('datalytics:avatar-updated', handleAvatarUpdate)
-    return () => window.removeEventListener('datalytics:avatar-updated', handleAvatarUpdate)
-  }, [])
-
   useEffect(() => {
     sidebarHoverPeekRef.current = sidebarHoverPeek
   }, [sidebarHoverPeek])

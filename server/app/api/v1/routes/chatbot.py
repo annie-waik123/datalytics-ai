@@ -33,7 +33,6 @@ from app.services.insight_generation_service import (
 )
 from app.services.llm_service import get_active_llm_summary, groq_chat, has_groq_config
 from app.state.session_store import store
-from app.core.ai_feature_flags import require_ai_feature
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -1289,8 +1288,6 @@ async def chat(
     if not user_message:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
-    await require_ai_feature("chatbot")
-
     resolved_mode = _resolve_mode(body.mode, user_message)
 
     try:
@@ -1342,8 +1339,6 @@ async def chat_recommendations(
     user_message = body.message.strip()
     if not user_message:
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
-
-    await require_ai_feature("chatbot")
 
     resolved_mode = _resolve_mode(body.mode, user_message)
     if resolved_mode not in {"recommendation_insights", "decision_making", "ai_insights"}:

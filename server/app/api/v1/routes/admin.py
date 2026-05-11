@@ -8,7 +8,8 @@ from typing import Any
 import bcrypt
 import jwt
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 
@@ -74,13 +75,6 @@ class AdminEmailRequest(BaseModel):
 class AdminProfileRequest(BaseModel):
     name: str = Field(min_length=2, max_length=80)
     avatar_url: str = ""
-
-
-class AIFeaturesRequest(BaseModel):
-    chatbot: bool = True
-    recommendations: bool = True
-    decision_making: bool = True
-    ai_insights: bool = True
 
 
 def hash_password(password: str) -> str:
@@ -609,7 +603,7 @@ async def delete_plan(plan_id: str, _: dict[str, Any] = Depends(require_admin)):
 
 
 @router.post("/admin/emails/send")
-async def admin_send_emails(req: AdminEmailRequest, background_tasks: BackgroundTasks, _: dict[str, Any] = Depends(require_admin)):
+async def admin_send_emails(req: AdminEmailRequest, _: dict[str, Any] = Depends(require_admin)):
     db = get_db()
     if "all" in req.userIds:
         users = await db.users.find({"email": {"$exists": True, "$ne": ""}}).to_list(length=10000)
@@ -667,45 +661,19 @@ async def admin_send_emails(req: AdminEmailRequest, background_tasks: Background
     html_content = html_template.replace("{{subject}}", subject).replace("{{body}}", body)
 
     sent = 0
+    failed = []
     for email in emails:
         try:
-            background_tasks.add_task(send_email, email, req.subject.strip(), html_content)
+            await run_in_threadpool(send_email, email, req.subject.strip(), html_content)
             sent += 1
-        except Exception as e:
-            print(f"[EMAIL] Failed to queue for {email}: {e}")
+        except Exception as exc:
+            print(f"[EMAIL] Failed to send to {email}: {exc}")
+            failed.append(email)
 
-    return {"ok": True, "count": sent}
+    if sent == 0 and emails:
+        raise HTTPException(
+            status_code=500,
+            detail=f"All emails failed to send. Error: check server SMTP configuration. Failed recipients: {', '.join(failed[:3])}"
+        )
 
-
-# ── AI Feature Kill Switch ─────────────────────────────────────────────────────
-
-DEFAULT_AI_FEATURES = {
-    "chatbot": True,
-    "recommendations": True,
-    "decision_making": True,
-    "ai_insights": True,
-}
-
-
-@router.get("/admin/ai-features")
-async def get_ai_features():
-    """Get current AI feature flags (public — used by frontend to check if features are enabled)."""
-    db = get_db()
-    doc = await db.admin_settings.find_one({"_id": "ai_features"})
-    if not doc:
-        return {"features": DEFAULT_AI_FEATURES}
-    flags = {k: doc.get(k, True) for k in DEFAULT_AI_FEATURES}
-    return {"features": flags}
-
-
-@router.put("/admin/ai-features")
-async def update_ai_features(req: AIFeaturesRequest, _: dict[str, Any] = Depends(require_admin)):
-    """Update AI feature kill-switch toggles (admin only)."""
-    db = get_db()
-    flags = req.model_dump()
-    await db.admin_settings.update_one(
-        {"_id": "ai_features"},
-        {"$set": {**flags, "updated_at": datetime.utcnow()}},
-        upsert=True,
-    )
-    return {"ok": True, "features": flags}
+    return {"ok": True, "count": sent, "failed": len(failed)}

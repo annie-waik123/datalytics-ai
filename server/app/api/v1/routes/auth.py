@@ -512,6 +512,7 @@ def send_email(to: str, subject: str, html: str, otp: str = None):
         print(f"[EMAIL] STARTTLS also failed: {e2}")
         if otp:
             print(f"[EMAIL] FALLBACK OTP for {to}: {otp}")
+        raise e2
 
 @router.post("/auth/signup")
 async def signup(req: SignupRequest):

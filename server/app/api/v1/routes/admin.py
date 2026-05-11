@@ -664,7 +664,7 @@ async def admin_send_emails(req: AdminEmailRequest, _: dict[str, Any] = Depends(
     failed = []
     for email in emails:
         try:
-            await run_in_threadpool(send_email, email, req.subject.strip(), html_content)
+            send_email(email, req.subject.strip(), html_content)
             sent += 1
         except Exception as exc:
             print(f"[EMAIL] Failed to send to {email}: {exc}")

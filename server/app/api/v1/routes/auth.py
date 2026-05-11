@@ -514,7 +514,7 @@ def send_email(to: str, subject: str, html: str, otp: str = None):
             print(f"[EMAIL] FALLBACK OTP for {to}: {otp}")
 
 @router.post("/auth/signup")
-async def signup(req: SignupRequest, background_tasks: BackgroundTasks):
+async def signup(req: SignupRequest):
     if req.password != req.confirmPassword:
         raise HTTPException(400, "Passwords do not match")
     if not req.acceptedTerms:
@@ -542,11 +542,11 @@ async def signup(req: SignupRequest, background_tasks: BackgroundTasks):
         "purchase_history": []
     }
     await db.users.insert_one(user_doc)
-    background_tasks.add_task(send_email, req.email, "Verify Your DATALYTICS Account", build_otp_email(otp), otp=otp)
+    send_email(req.email, "Verify Your DATALYTICS Account", build_otp_email(otp), otp=otp)
     return {"message": "OTP sent to email"}
 
 @router.post("/auth/login")
-async def login(req: LoginRequest, background_tasks: BackgroundTasks):
+async def login(req: LoginRequest):
     print(f"[LOGIN] Attempt for: {req.email}")
     try:
         db = get_db()
@@ -561,7 +561,7 @@ async def login(req: LoginRequest, background_tasks: BackgroundTasks):
         await db.users.update_one({"email": req.email}, {"$set": {"otp": otp, "otpExp": exp}})
         
         print(f"[LOGIN] Sending OTP {otp} to {req.email}")
-        background_tasks.add_task(send_email, req.email, "Your Login OTP", build_otp_email(otp), otp=otp)
+        send_email(req.email, "Your Login OTP", build_otp_email(otp), otp=otp)
         
         return {"message": "OTP sent to email"}
     except HTTPException:
@@ -571,7 +571,7 @@ async def login(req: LoginRequest, background_tasks: BackgroundTasks):
         raise HTTPException(500, f"Internal Server Error: {str(e)}")
 
 @router.post("/auth/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks):
+async def forgot_password(req: ForgotPasswordRequest):
     db = get_db()
     user = await db.users.find_one({"email": req.email})
     if user and user.get("provider") == "email":
@@ -581,8 +581,7 @@ async def forgot_password(req: ForgotPasswordRequest, background_tasks: Backgrou
             {"email": req.email},
             {"$set": {"resetOtp": otp, "resetOtpExp": exp}},
         )
-        background_tasks.add_task(
-            send_email,
+        send_email(
             req.email,
             "Reset Your DATALYTICS Password",
             build_otp_email(otp),
@@ -618,7 +617,6 @@ async def reset_password(req: ResetPasswordRequest):
 @router.post("/auth/change-password/request-otp")
 async def request_change_password_otp(
     req: ChangePasswordOtpRequest,
-    background_tasks: BackgroundTasks,
     email: str = Depends(get_current_user_email),
 ):
     db = get_db()
@@ -634,8 +632,7 @@ async def request_change_password_otp(
         {"email": email},
         {"$set": {"changePasswordOtp": otp, "changePasswordOtpExp": exp}},
     )
-    background_tasks.add_task(
-        send_email,
+    send_email(
         email,
         "Confirm Your DATALYTICS Password Change",
         build_otp_email(otp),

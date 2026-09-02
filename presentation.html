@@ -1,0 +1,1287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Datalytics AI – Project Presentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Fira+Code:wght@400;500&display=swap');
+
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --accent: #6366f1;
+    --accent2: #8b5cf6;
+    --accent3: #06b6d4;
+    --green: #10b981;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --text: #f1f5f9;
+    --muted: #94a3b8;
+    --border: rgba(99,102,241,0.25);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* ── Slide Container ── */
+  .slides-wrapper {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateX(60px);
+    pointer-events: none;
+    transition: opacity .5s ease, transform .5s ease;
+    padding: 48px 72px;
+    overflow: hidden;
+  }
+
+  .slide.active {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: all;
+  }
+
+  .slide.exit {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+
+  /* ── Decorative BG ── */
+  .slide::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 80% 20%, rgba(99,102,241,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 60% at 10% 80%, rgba(6,182,212,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .slide > * { position: relative; z-index: 1; }
+
+  /* ── Navigation ── */
+  .nav {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: rgba(17,24,39,0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 50px;
+    padding: 10px 20px;
+    z-index: 1000;
+  }
+
+  .nav button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 20px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all .2s;
+    letter-spacing: .3px;
+  }
+  .nav button:hover { background: var(--accent); border-color: var(--accent); }
+  .nav button:disabled { opacity: .3; cursor: not-allowed; }
+
+  .slide-counter {
+    font-size: 12px;
+    color: var(--muted);
+    min-width: 60px;
+    text-align: center;
+    font-weight: 500;
+  }
+
+  /* ── Progress Bar ── */
+  .progress-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: rgba(99,102,241,0.2);
+    z-index: 1000;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent3));
+    transition: width .4s ease;
+    border-radius: 0 3px 3px 0;
+  }
+
+  /* ── Typography ── */
+  .slide-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .slide-tag::before { content: ''; width: 24px; height: 2px; background: var(--accent); border-radius: 2px; }
+
+  h1 { font-size: 56px; font-weight: 900; line-height: 1.05; }
+  h2 { font-size: 38px; font-weight: 800; line-height: 1.15; margin-bottom: 32px; }
+  h3 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  p { color: var(--muted); font-size: 16px; line-height: 1.7; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    transition: border-color .2s;
+  }
+  .card:hover { border-color: var(--accent); }
+
+  .card-grid {
+    display: grid;
+    gap: 16px;
+  }
+  .card-grid.cols-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+
+  /* ── Badge ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: .3px;
+  }
+  .badge-indigo { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,.3); }
+  .badge-cyan   { background: rgba(6,182,212,0.15);  color: #22d3ee; border: 1px solid rgba(6,182,212,.3);  }
+  .badge-green  { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,.3); }
+  .badge-orange { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,.3); }
+  .badge-red    { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,.3);  }
+  .badge-purple { background: rgba(139,92,246,0.15); color: #a78bfa; border: 1px solid rgba(139,92,246,.3); }
+
+  /* ── Icon circles ── */
+  .icon-circle {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+    margin-bottom: 12px;
+    flex-shrink: 0;
+  }
+  .ic-indigo { background: rgba(99,102,241,.2); }
+  .ic-cyan   { background: rgba(6,182,212,.2); }
+  .ic-green  { background: rgba(16,185,129,.2); }
+  .ic-orange { background: rgba(245,158,11,.2); }
+  .ic-purple { background: rgba(139,92,246,.2); }
+
+  /* ── Code Block ── */
+  .code-block {
+    background: #0d1117;
+    border: 1px solid rgba(99,102,241,.2);
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    color: #c9d1d9;
+    white-space: pre;
+    overflow: auto;
+  }
+  .code-block .kw   { color: #ff7b72; }
+  .code-block .fn   { color: #d2a8ff; }
+  .code-block .str  { color: #a5d6ff; }
+  .code-block .cm   { color: #8b949e; font-style: italic; }
+  .code-block .num  { color: #79c0ff; }
+
+  /* ── Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th {
+    background: rgba(99,102,241,.15);
+    padding: 10px 16px;
+    text-align: left;
+    font-weight: 700;
+    color: #818cf8;
+    font-size: 12px;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+  }
+  td {
+    padding: 10px 16px;
+    border-top: 1px solid rgba(255,255,255,.05);
+    color: var(--muted);
+  }
+  tr:hover td { background: rgba(99,102,241,.05); }
+
+  /* ── Stat Pills ── */
+  .stat-pill {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-pill .num  { font-size: 36px; font-weight: 900; line-height: 1; }
+  .stat-pill .lbl  { font-size: 12px; color: var(--muted); margin-top: 4px; font-weight: 500; }
+
+  /* ── Timeline ── */
+  .timeline { display: flex; flex-direction: column; gap: 16px; }
+  .tl-item  { display: flex; gap: 20px; align-items: flex-start; }
+  .tl-dot   {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(99,102,241,.2); border: 2px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: var(--accent);
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .tl-content h4 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .tl-content p  { font-size: 13px; margin: 0; }
+
+  /* ── Flow ── */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .flow-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow { color: var(--accent); font-size: 20px; font-weight: 900; }
+
+  /* ── Bullet list ── */
+  .bullet-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .bullet-list li {
+    display: flex; align-items: flex-start; gap: 10px;
+    color: var(--muted); font-size: 15px;
+  }
+  .bullet-list li::before {
+    content: '▸';
+    color: var(--accent);
+    font-size: 14px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .bullet-list li strong { color: var(--text); }
+
+  /* ── Divider ── */
+  .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+  /* ── Slide 1: Cover ── */
+  #slide-1 {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 20px;
+  }
+  #slide-1 .logo-box {
+    width: 90px; height: 90px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 42px;
+    box-shadow: 0 0 60px rgba(99,102,241,.5);
+    margin: 0 auto 12px;
+    animation: pulse 3s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 40px rgba(99,102,241,.4); }
+    50%       { box-shadow: 0 0 80px rgba(99,102,241,.8); }
+  }
+  #slide-1 h1 { font-size: 64px; font-weight: 900; }
+  #slide-1 .subtitle { font-size: 20px; color: var(--muted); max-width: 600px; line-height: 1.6; }
+  #slide-1 .author-chip {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 40px; padding: 10px 20px; font-size: 14px;
+    margin-top: 8px;
+  }
+  #slide-1 .tags { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+  /* ── Responsive clip for slide content ── */
+  .slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+
+  /* Keyboard hint */
+  .key-hint {
+    position: fixed;
+    top: 16px; right: 20px;
+    font-size: 11px; color: var(--muted);
+    background: rgba(17,24,39,.8);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 12px;
+    z-index: 1000;
+  }
+</style>
+</head>
+<body>
+
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+<div class="key-hint">← → Arrow Keys to navigate</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 1 — COVER
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slides-wrapper" id="deck">
+
+<div class="slide active" id="slide-1">
+  <div class="logo-box">🔮</div>
+  <h1><span class="gradient-text">Datalytics AI</span></h1>
+  <p class="subtitle">An End-to-End Intelligent Data Analytics &amp;<br/>Machine Learning Platform</p>
+  <div class="tags">
+    <span class="badge badge-indigo">Next.js 15</span>
+    <span class="badge badge-cyan">FastAPI</span>
+    <span class="badge badge-green">MongoDB</span>
+    <span class="badge badge-orange">Redis + Celery</span>
+    <span class="badge badge-purple">ML + AI</span>
+    <span class="badge badge-red">Razorpay</span>
+  </div>
+  <div class="author-chip">
+    <span>👤</span>
+    <strong>Sangam Singh</strong>
+    <span style="color:var(--muted)">·</span>
+    <span style="color:var(--muted)">singhsangam5400@gmail.com</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 2 — PROBLEM + SOLUTION
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-2">
+  <div class="slide-tag">Introduction</div>
+  <h2>Problem &amp; <span class="gradient-text">Solution</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-2" style="gap:24px; align-items:stretch;">
+      <div class="card" style="border-color:rgba(239,68,68,.3);">
+        <div class="icon-circle" style="background:rgba(239,68,68,.15); margin-bottom:16px;">🚨</div>
+        <h3 style="color:#f87171; margin-bottom:16px;">The Problem</h3>
+        <ul class="bullet-list">
+          <li>Most people have data but <strong>no way to analyze it</strong></li>
+          <li>Hiring data scientists is <strong>expensive &amp; slow</strong></li>
+          <li>Existing tools are <strong>too complex</strong> for non-technical users</li>
+          <li>No single platform covers <strong>EDA + ML + AI + Reports</strong></li>
+          <li>Connecting multiple data sources is <strong>painful</strong></li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(16,185,129,.3);">
+        <div class="icon-circle ic-green" style="margin-bottom:16px;">✅</div>
+        <h3 style="color:#34d399; margin-bottom:16px;">Our Solution</h3>
+        <ul class="bullet-list">
+          <li><strong>Upload any dataset</strong> — CSV, Excel, JSON, DB, API</li>
+          <li><strong>Automated EDA</strong> — instant data profiling &amp; insights</li>
+          <li><strong>No-code ML</strong> — train models with one click</li>
+          <li><strong>AI chatbot</strong> — ask questions about your data in plain English</li>
+          <li><strong>Export reports</strong> — professional analytics PDFs instantly</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px; background:rgba(99,102,241,.06); border-color:rgba(99,102,241,.3);">
+      <p style="font-size:15px; text-align:center; color:var(--text);">
+        💡 <strong>Datalytics AI</strong> democratizes data science — giving every student, business owner, and analyst the power of a full data team in one browser tab.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 3 — TECH STACK
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-3">
+  <div class="slide-tag">Technology</div>
+  <h2>The <span class="gradient-text">Tech Stack</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-2" style="gap:20px;">
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+          <span style="font-size:24px;">🖥️</span>
+          <h3 style="margin:0; color:#818cf8;">Frontend</h3>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span class="badge badge-indigo">Next.js 15</span>
+          <span class="badge badge-indigo">React 19</span>
+          <span class="badge badge-cyan">Tailwind CSS</span>
+          <span class="badge badge-purple">Framer Motion</span>
+          <span class="badge badge-orange">Three.js</span>
+          <span class="badge badge-green">Chart.js</span>
+          <span class="badge badge-indigo">Plotly.js</span>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+          <span style="font-size:24px;">⚙️</span>
+          <h3 style="margin:0; color:#22d3ee;">Backend</h3>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span class="badge badge-cyan">FastAPI</span>
+          <span class="badge badge-cyan">Uvicorn</span>
+          <span class="badge badge-cyan">Gunicorn</span>
+          <span class="badge badge-indigo">Python 3.x</span>
+          <span class="badge badge-purple">PyJWT</span>
+          <span class="badge badge-orange">bcrypt</span>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+          <span style="font-size:24px;">🧠</span>
+          <h3 style="margin:0; color:#34d399;">ML &amp; Data</h3>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span class="badge badge-green">scikit-learn</span>
+          <span class="badge badge-orange">XGBoost</span>
+          <span class="badge badge-orange">CatBoost</span>
+          <span class="badge badge-green">Pandas</span>
+          <span class="badge badge-green">NumPy</span>
+          <span class="badge badge-green">Dask</span>
+          <span class="badge badge-cyan">Plotly</span>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+          <span style="font-size:24px;">🗄️</span>
+          <h3 style="margin:0; color:#fbbf24;">Database &amp; AI</h3>
+        </div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <span class="badge badge-green">MongoDB</span>
+          <span class="badge badge-green">Motor (Async)</span>
+          <span class="badge badge-red">Redis</span>
+          <span class="badge badge-green">Celery</span>
+          <span class="badge badge-orange">Groq API</span>
+          <span class="badge badge-indigo">OpenAI</span>
+          <span class="badge badge-cyan">Razorpay</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 4 — ARCHITECTURE
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-4">
+  <div class="slide-tag">Architecture</div>
+  <h2>System <span class="gradient-text">Architecture</span></h2>
+  <div class="slide-content">
+    <div style="display:flex; gap:24px; align-items:stretch; height:100%;">
+
+      <div style="flex:1; display:flex; flex-direction:column; gap:16px; justify-content:center;">
+
+        <div class="card" style="border-color:rgba(99,102,241,.4);">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:28px;">🌐</span>
+            <div>
+              <h4 style="font-size:14px; font-weight:700; color:#818cf8;">LAYER 1 — Frontend</h4>
+              <p style="font-size:13px; margin:0;">Next.js 15 on port 5000 · Landing, Workspace, Admin Panel, API Connector Routes</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center; color:var(--accent); font-size:22px;">⬇ HTTP / REST API</div>
+
+        <div class="card" style="border-color:rgba(6,182,212,.4);">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:28px;">⚡</span>
+            <div>
+              <h4 style="font-size:14px; font-weight:700; color:#22d3ee;">LAYER 2 — FastAPI Backend</h4>
+              <p style="font-size:13px; margin:0;">Port 8000 · Auth, Upload, EDA, Preprocess, Train, Predict, Chatbot, Reports, Admin</p>
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center; color:var(--accent); font-size:22px;">⬇ Async DB + Queues</div>
+
+        <div class="card-grid cols-3" style="gap:12px;">
+          <div class="card" style="padding:16px; border-color:rgba(16,185,129,.3);">
+            <div style="font-size:20px; margin-bottom:6px;">🍃</div>
+            <div style="font-size:12px; font-weight:700; color:#34d399;">MongoDB</div>
+            <div style="font-size:11px; color:var(--muted);">Users, Datasets, Payments, Logs</div>
+          </div>
+          <div class="card" style="padding:16px; border-color:rgba(239,68,68,.3);">
+            <div style="font-size:20px; margin-bottom:6px;">⚡</div>
+            <div style="font-size:12px; font-weight:700; color:#f87171;">Redis + Celery</div>
+            <div style="font-size:11px; color:var(--muted);">Cache + Background Tasks</div>
+          </div>
+          <div class="card" style="padding:16px; border-color:rgba(245,158,11,.3);">
+            <div style="font-size:20px; margin-bottom:6px;">🌍</div>
+            <div style="font-size:12px; font-weight:700; color:#fbbf24;">External APIs</div>
+            <div style="font-size:11px; color:var(--muted);">Groq · OpenAI · Razorpay · SMTP</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="width:280px; flex-shrink:0; padding:20px;">
+        <h4 style="font-size:13px; color:#818cf8; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">API Routes</h4>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <span class="badge badge-indigo" style="justify-content:flex-start;">/api/auth</span>
+          <span class="badge badge-cyan" style="justify-content:flex-start;">/api/upload</span>
+          <span class="badge badge-green" style="justify-content:flex-start;">/api/eda</span>
+          <span class="badge badge-green" style="justify-content:flex-start;">/api/preprocess</span>
+          <span class="badge badge-orange" style="justify-content:flex-start;">/api/train</span>
+          <span class="badge badge-orange" style="justify-content:flex-start;">/api/predict</span>
+          <span class="badge badge-purple" style="justify-content:flex-start;">/api/chatbot</span>
+          <span class="badge badge-cyan" style="justify-content:flex-start;">/api/reports</span>
+          <span class="badge badge-red" style="justify-content:flex-start;">/api/payment</span>
+          <span class="badge badge-indigo" style="justify-content:flex-start;">/api/admin</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 5 — KEY FEATURES
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-5">
+  <div class="slide-tag">Features</div>
+  <h2>Key <span class="gradient-text">Features</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-4" style="gap:14px;">
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">🔐</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">Authentication</h4>
+        <p style="font-size:12px;">Email OTP · Google Login · JWT · Activity Tracking</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">📁</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">Data Upload</h4>
+        <p style="font-size:12px;">CSV · Excel · JSON · MySQL · MongoDB · Google Sheets · PDF</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">🔍</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">EDA</h4>
+        <p style="font-size:12px;">Auto Profiling · Missing Values · Correlations · Outliers</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">🛠️</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">Data Prep</h4>
+        <p style="font-size:12px;">Cleaning · Encoding · Scaling · Validation · Transform</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">📊</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">Visualizations</h4>
+        <p style="font-size:12px;">Interactive Plotly Charts · Dashboards · Auto-Recommend</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">🤖</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">Machine Learning</h4>
+        <p style="font-size:12px;">Classification · Regression · Clustering · Model Compare</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">💬</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">AI Chatbot</h4>
+        <p style="font-size:12px;">Groq/OpenAI powered · Dataset-aware · Smart Insights</p>
+      </div>
+      <div class="card" style="text-align:center; padding:20px 16px;">
+        <div style="font-size:30px; margin-bottom:8px;">💳</div>
+        <h4 style="font-size:14px; margin-bottom:6px;">Payments</h4>
+        <p style="font-size:12px;">Razorpay · Free/Basic/Pro Plans · Credit System</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 6 — WORKFLOW
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-6">
+  <div class="slide-tag">Workflow</div>
+  <h2>End-to-End <span class="gradient-text">User Flow</span></h2>
+  <div class="slide-content">
+    <div class="timeline">
+      <div class="tl-item">
+        <div class="tl-dot">1</div>
+        <div class="tl-content">
+          <h4>Sign Up / Login</h4>
+          <p>User registers with email + OTP verification OR signs in with Google. JWT token issued for all future requests.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">2</div>
+        <div class="tl-content">
+          <h4>Upload Dataset</h4>
+          <p>Upload CSV, Excel, JSON, or connect to MySQL / MongoDB / Google Sheets / API. Backend validates &amp; profiles the data.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">3</div>
+        <div class="tl-content">
+          <h4>Explore Data (EDA)</h4>
+          <p>Automated analysis: missing values, distributions, correlations, outliers, data quality scores — all in seconds.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">4</div>
+        <div class="tl-content">
+          <h4>Prepare &amp; Clean</h4>
+          <p>Handle missing data, convert types, encode categories, scale numbers — ready for ML training.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">5</div>
+        <div class="tl-content">
+          <h4>Visualize</h4>
+          <p>Auto-recommended interactive Plotly charts. Build custom dashboards. Export as images.</p>
+        </div>
+      </div>
+      <div class="tl-item">
+        <div class="tl-dot">6</div>
+        <div class="tl-content">
+          <h4>Train ML Model → Predict → Ask AI → Export Report</h4>
+          <p>Train classification/regression/clustering models. Run predictions. Ask the AI chatbot questions. Download full analytics report.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 7 — AUTHENTICATION
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-7">
+  <div class="slide-tag">Security</div>
+  <h2>Authentication &amp; <span class="gradient-text">Security</span></h2>
+  <div class="slide-content">
+    <div style="display:flex; gap:24px; height:100%;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:16px; justify-content:center;">
+        <div class="card">
+          <h3 style="color:#818cf8; font-size:16px; margin-bottom:12px;">📧 Email + OTP Flow</h3>
+          <div class="flow" style="gap:6px;">
+            <div class="flow-box">Register</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">bcrypt hash</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Send OTP</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Verify</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box" style="color:var(--green);">JWT Token</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:#22d3ee; font-size:16px; margin-bottom:12px;">🔵 Google OAuth Flow</h3>
+          <div class="flow" style="gap:6px;">
+            <div class="flow-box">Google Login</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Firebase</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">google-auth verify</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box" style="color:var(--green);">JWT Token</div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:#34d399; font-size:16px; margin-bottom:12px;">🔑 Every API Request</h3>
+          <div class="flow" style="gap:6px;">
+            <div class="flow-box">Request + JWT</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Middleware</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Decode &amp; Verify</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box" style="color:var(--green);">Access Granted</div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="width:260px; flex-shrink:0; padding:20px;">
+        <h4 style="font-size:13px; color:#818cf8; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">Security Stack</h4>
+        <ul class="bullet-list" style="gap:14px;">
+          <li><strong>bcrypt</strong> — Password hashing with salt</li>
+          <li><strong>PyJWT</strong> — Token creation &amp; verification</li>
+          <li><strong>SMTP OTP</strong> — Email 2-factor verification</li>
+          <li><strong>google-auth</strong> — Google token validation</li>
+          <li><strong>CORS</strong> — Cross-origin protection</li>
+          <li><strong>Session ID</strong> — Unique UUID per session</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 8 — DATABASE
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-8">
+  <div class="slide-tag">Data Layer</div>
+  <h2>Database &amp; <span class="gradient-text">Queue System</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-3" style="gap:20px;">
+      <div class="card" style="border-color:rgba(16,185,129,.3);">
+        <div style="font-size:36px; margin-bottom:12px;">🍃</div>
+        <h3 style="color:#34d399;">MongoDB + Motor</h3>
+        <div class="divider"></div>
+        <ul class="bullet-list" style="font-size:13px;">
+          <li>Flexible <strong>NoSQL</strong> document store</li>
+          <li><strong>Motor</strong> = async driver (no blocking)</li>
+          <li>Stores users, datasets, payments, activity logs</li>
+          <li>No fixed schema — adapts to any dataset shape</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(239,68,68,.3);">
+        <div style="font-size:36px; margin-bottom:12px;">⚡</div>
+        <h3 style="color:#f87171;">Redis Cache</h3>
+        <div class="divider"></div>
+        <ul class="bullet-list" style="font-size:13px;">
+          <li>In-memory (RAM) — <strong>super fast</strong></li>
+          <li>Caches EDA results — no repeated DB calls</li>
+          <li>Acts as <strong>message broker</strong> for Celery</li>
+          <li>Session &amp; temporary data storage</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(55,129,74,.3);">
+        <div style="font-size:36px; margin-bottom:12px;">🌿</div>
+        <h3 style="color:#4ade80;">Celery Workers</h3>
+        <div class="divider"></div>
+        <ul class="bullet-list" style="font-size:13px;">
+          <li>Runs <strong>heavy tasks in background</strong></li>
+          <li>ML model training (minutes long)</li>
+          <li>Large EDA jobs on big files</li>
+          <li>User gets instant response — no freezing</li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:20px; padding:16px 24px;">
+      <div class="flow" style="justify-content:center;">
+        <div class="flow-box">User Request</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">FastAPI (async)</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box" style="color:var(--red);">Redis Queue</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box" style="color:#4ade80;">Celery Worker</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box">MongoDB Store</div>
+        <span class="flow-arrow">→</span>
+        <div class="flow-box" style="color:var(--green);">Result Ready</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 9 — EDA & DATA PREP
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-9">
+  <div class="slide-tag">Data Intelligence</div>
+  <h2>EDA &amp; Data <span class="gradient-text">Preparation</span></h2>
+  <div class="slide-content">
+    <div style="display:flex; gap:24px; height:100%;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:16px; justify-content:center;">
+        <div class="card">
+          <h3 style="color:#818cf8; margin-bottom:14px;">🔍 What EDA Detects Automatically</h3>
+          <div class="card-grid cols-2" style="gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted);">
+              <span>📉</span> Missing values per column
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted);">
+              <span>📋</span> Data types detection
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted);">
+              <span>📊</span> Statistical distributions
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted);">
+              <span>🔁</span> Duplicate rows detection
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted);">
+              <span>🔗</span> Feature correlations
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted);">
+              <span>🎯</span> Outliers identification
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 style="color:#22d3ee; margin-bottom:14px;">🛠️ Preprocessing Steps</h3>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <span class="badge badge-indigo">Fill Missing (Mean/Median/Mode)</span>
+            <span class="badge badge-cyan">Drop Null Rows</span>
+            <span class="badge badge-green">Label Encoding</span>
+            <span class="badge badge-green">One-Hot Encoding</span>
+            <span class="badge badge-orange">Min-Max Scaling</span>
+            <span class="badge badge-orange">Standard Scaling</span>
+            <span class="badge badge-purple">Type Conversion</span>
+            <span class="badge badge-red">Outlier Removal</span>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="width:260px; flex-shrink:0;">
+        <h4 style="font-size:13px; color:#818cf8; margin-bottom:16px; text-transform:uppercase; letter-spacing:1px;">Libraries Used</h4>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#34d399; margin-bottom:4px;">Pandas</div>
+            <p style="font-size:12px; margin:0;">Read, filter, clean, transform tabular data</p>
+          </div>
+          <div class="divider"></div>
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#60a5fa; margin-bottom:4px;">NumPy</div>
+            <p style="font-size:12px; margin:0;">Fast math operations on arrays</p>
+          </div>
+          <div class="divider"></div>
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:4px;">Dask</div>
+            <p style="font-size:12px; margin:0;">Process huge files that don't fit in RAM</p>
+          </div>
+          <div class="divider"></div>
+          <div>
+            <div style="font-size:13px; font-weight:700; color:#a78bfa; margin-bottom:4px;">scikit-learn</div>
+            <p style="font-size:12px; margin:0;">StandardScaler, LabelEncoder, OneHotEncoder</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 10 — MACHINE LEARNING
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-10">
+  <div class="slide-tag">Machine Learning</div>
+  <h2>ML <span class="gradient-text">Models &amp; Training</span></h2>
+  <div class="slide-content">
+    <div style="display:flex; gap:20px; height:100%;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:16px; justify-content:center;">
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Models Supported</th>
+              <th>Evaluation Metrics</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-indigo">Classification</span></td>
+              <td>Logistic Regression, Decision Tree, Random Forest, XGBoost, CatBoost</td>
+              <td>Accuracy, Precision, Recall, F1, Confusion Matrix</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-orange">Regression</span></td>
+              <td>Linear Regression, Random Forest Regressor, XGBoost Regressor</td>
+              <td>MAE, RMSE, R² Score</td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-green">Clustering</span></td>
+              <td>K-Means</td>
+              <td>Inertia, Silhouette Score</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="card" style="margin-top:8px;">
+          <h3 style="color:#818cf8; font-size:15px; margin-bottom:12px;">🔄 Training Pipeline</h3>
+          <div class="flow">
+            <div class="flow-box">Pick Model + Target</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">80/20 Train-Test Split</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Celery Background Train</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box">Evaluate Metrics</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box" style="color:var(--green);">Compare &amp; Export</div>
+          </div>
+        </div>
+      </div>
+      <div style="width:220px; display:flex; flex-direction:column; gap:12px; justify-content:center;">
+        <div class="card" style="border-color:rgba(245,158,11,.3); text-align:center; padding:16px;">
+          <div style="font-size:26px; margin-bottom:6px;">⚡</div>
+          <div style="font-size:13px; font-weight:700; color:#fbbf24;">XGBoost</div>
+          <p style="font-size:11px; margin:0;">Gradient boosting on many small trees. Handles missing values. Very accurate.</p>
+        </div>
+        <div class="card" style="border-color:rgba(245,158,11,.3); text-align:center; padding:16px;">
+          <div style="font-size:26px; margin-bottom:6px;">🐱</div>
+          <div style="font-size:13px; font-weight:700; color:#fbbf24;">CatBoost</div>
+          <p style="font-size:11px; margin:0;">Auto-handles categorical columns. Less overfitting. Easier to use.</p>
+        </div>
+        <div class="card" style="text-align:center; padding:16px;">
+          <div style="font-size:26px; margin-bottom:6px;">🛡️</div>
+          <div style="font-size:13px; font-weight:700; color:#818cf8;">Overfitting Prevention</div>
+          <p style="font-size:11px; margin:0;">Cross-validation, regularization, early stopping</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 11 — VISUALIZATIONS
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-11">
+  <div class="slide-tag">Visualization</div>
+  <h2>Smart <span class="gradient-text">Visualizations</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-2" style="gap:20px;">
+      <div class="card">
+        <h3 style="color:#818cf8; margin-bottom:14px;">📊 Chart Auto-Recommendation Logic</h3>
+        <table style="font-size:13px;">
+          <thead>
+            <tr><th>Data Pattern Detected</th><th>Recommended Chart</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Two numeric columns</td><td>🟣 Scatter Plot</td></tr>
+            <tr><td>Category + Number</td><td>📊 Bar Chart</td></tr>
+            <tr><td>Time column + Number</td><td>📈 Line Chart</td></tr>
+            <tr><td>One category only</td><td>🥧 Pie Chart</td></tr>
+            <tr><td>Many numeric columns</td><td>🌡️ Heatmap / Correlation</td></tr>
+            <tr><td>Single numeric column</td><td>📉 Histogram</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:14px;">
+        <div class="card" style="border-color:rgba(99,102,241,.3);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+            <span style="font-size:20px;">🎯</span>
+            <h4 style="font-size:14px; color:#818cf8;">Plotly (Main Engine)</h4>
+          </div>
+          <p style="font-size:13px;">Interactive web charts — zoom, hover, filter, export. Used in backend visualization_service.py (70KB of logic!)</p>
+        </div>
+        <div class="card" style="border-color:rgba(6,182,212,.3);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+            <span style="font-size:20px;">📱</span>
+            <h4 style="font-size:14px; color:#22d3ee;">Chart.js (Frontend)</h4>
+          </div>
+          <p style="font-size:13px;">Lightweight canvas charts for the dashboard. Smooth animations, responsive design.</p>
+        </div>
+        <div class="card" style="border-color:rgba(139,92,246,.3);">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+            <span style="font-size:20px;">🌐</span>
+            <h4 style="font-size:14px; color:#a78bfa;">Three.js + Framer Motion</h4>
+          </div>
+          <p style="font-size:13px;">3D landing page effects and smooth micro-animations throughout the UI.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 12 — AI CHATBOT
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-12">
+  <div class="slide-tag">Artificial Intelligence</div>
+  <h2>AI Chatbot &amp; <span class="gradient-text">Insights</span></h2>
+  <div class="slide-content">
+    <div style="display:flex; gap:24px; height:100%;">
+      <div style="flex:1; display:flex; flex-direction:column; gap:16px; justify-content:center;">
+        <div class="card" style="border-color:rgba(249,115,22,.3);">
+          <h3 style="color:#fb923c; margin-bottom:14px;">🔥 How the Chatbot Works</h3>
+          <div class="timeline">
+            <div class="tl-item">
+              <div class="tl-dot" style="font-size:12px;">1</div>
+              <div class="tl-content">
+                <h4>User asks a question</h4>
+                <p>e.g. "Which columns have the most missing values?" or "What pattern do you see in my sales data?"</p>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot" style="font-size:12px;">2</div>
+              <div class="tl-content">
+                <h4>Backend builds a context-aware prompt</h4>
+                <p>Dataset summary + column info + user question → combined into a smart prompt</p>
+              </div>
+            </div>
+            <div class="tl-item">
+              <div class="tl-dot" style="font-size:12px;">3</div>
+              <div class="tl-content">
+                <h4>Groq API returns a natural language answer</h4>
+                <p>LLaMA 3 / Mixtral model understands the data context and gives a detailed, relevant response</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="width:260px; display:flex; flex-direction:column; gap:14px; justify-content:center;">
+        <div class="card" style="border-color:rgba(249,115,22,.3);">
+          <h4 style="font-size:13px; color:#fb923c; margin-bottom:10px;">⚡ Groq vs OpenAI</h4>
+          <table style="font-size:12px;">
+            <tbody>
+              <tr><td style="color:var(--text);">Speed</td><td style="color:#34d399;">Groq → Fastest</td></tr>
+              <tr><td style="color:var(--text);">Cost</td><td style="color:#34d399;">Groq → Cheaper</td></tr>
+              <tr><td style="color:var(--text);">Primary</td><td style="color:#fbbf24;">Groq</td></tr>
+              <tr><td style="color:var(--text);">Fallback</td><td style="color:#60a5fa;">OpenAI GPT</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <h4 style="font-size:13px; color:#818cf8; margin-bottom:10px;">🧠 Other AI Features</h4>
+          <ul class="bullet-list" style="font-size:12px;">
+            <li><strong>Recommendations</strong> — suggest best ML model</li>
+            <li><strong>Decision support</strong> — next steps guidance</li>
+            <li><strong>Smart explanations</strong> — explain model results</li>
+            <li><strong>Insight generation</strong> — auto business insights</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 13 — PAYMENTS & ADMIN
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-13">
+  <div class="slide-tag">Business Logic</div>
+  <h2>Payments &amp; <span class="gradient-text">Admin Panel</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-2" style="gap:20px;">
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div class="card" style="border-color:rgba(6,182,212,.3);">
+          <h3 style="color:#22d3ee; margin-bottom:14px;">💳 Razorpay Payment System</h3>
+          <div class="flow" style="flex-direction:column; align-items:flex-start; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);">
+              <span class="badge badge-cyan" style="font-size:11px;">1</span> User selects Free / Basic / Pro plan
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);">
+              <span class="badge badge-cyan" style="font-size:11px;">2</span> Razorpay popup opens (card / UPI)
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);">
+              <span class="badge badge-cyan" style="font-size:11px;">3</span> Payment confirmed via webhook
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted);">
+              <span class="badge badge-green" style="font-size:11px;">4</span> Credits added to user account in MongoDB
+            </div>
+          </div>
+        </div>
+        <div class="card-grid cols-3" style="gap:10px;">
+          <div class="stat-pill">
+            <div class="num" style="color:#94a3b8; font-size:22px;">FREE</div>
+            <div class="lbl">Basic credits</div>
+          </div>
+          <div class="stat-pill">
+            <div class="num" style="color:#60a5fa; font-size:22px;">BASIC</div>
+            <div class="lbl">More credits</div>
+          </div>
+          <div class="stat-pill">
+            <div class="num" style="color:#fbbf24; font-size:22px;">PRO</div>
+            <div class="lbl">Unlimited</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="color:#f87171; margin-bottom:14px;">🛡️ Admin Panel Features</h3>
+        <ul class="bullet-list">
+          <li><strong>Analytics Overview</strong> — platform usage stats</li>
+          <li><strong>User Management</strong> — view all users, block/unblock</li>
+          <li><strong>Payment History</strong> — all transactions</li>
+          <li><strong>Plan Management</strong> — edit credit limits</li>
+          <li><strong>Email Campaigns</strong> — send announcements/offers</li>
+          <li><strong>Activity Logs</strong> — every user action tracked</li>
+          <li><strong>Login/Logout Logs</strong> — security monitoring</li>
+          <li><strong>Admin Profile</strong> — editable admin settings</li>
+        </ul>
+        <div class="divider"></div>
+        <p style="font-size:13px;">📍 Admin accessible at <code style="color:#818cf8;">localhost:5000/admin</code></p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 14 — CHALLENGES & SOLUTIONS
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-14">
+  <div class="slide-tag">Engineering</div>
+  <h2>Challenges &amp; <span class="gradient-text">Solutions</span></h2>
+  <div class="slide-content">
+    <div style="display:flex; flex-direction:column; gap:14px; justify-content:center; height:100%;">
+      <div class="card" style="display:flex; gap:20px; align-items:center;">
+        <div class="icon-circle ic-orange" style="width:44px;height:44px;font-size:18px;">⚡</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <h4>Large Dataset Performance</h4>
+            <span class="badge badge-orange">Solved</span>
+          </div>
+          <p style="font-size:13px; margin:0;"><strong>Problem:</strong> Pandas is slow on 500MB+ files. <strong>Solution:</strong> Used <strong>Dask</strong> for parallel chunk-based processing — 5x faster on large files.</p>
+        </div>
+      </div>
+      <div class="card" style="display:flex; gap:20px; align-items:center;">
+        <div class="icon-circle ic-purple" style="width:44px;height:44px;font-size:18px;">🔄</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <h4>ML Training Blocking the API</h4>
+            <span class="badge badge-purple">Solved</span>
+          </div>
+          <p style="font-size:13px; margin:0;"><strong>Problem:</strong> Training takes minutes — API would freeze. <strong>Solution:</strong> <strong>Celery + Redis</strong> background workers. User gets instant "started" response.</p>
+        </div>
+      </div>
+      <div class="card" style="display:flex; gap:20px; align-items:center;">
+        <div class="icon-circle ic-cyan" style="width:44px;height:44px;font-size:18px;">🌐</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <h4>Frontend–Backend CORS Issues</h4>
+            <span class="badge badge-cyan">Solved</span>
+          </div>
+          <p style="font-size:13px; margin:0;"><strong>Problem:</strong> Port 5000 ↔ Port 8000 = CORS errors everywhere. <strong>Solution:</strong> FastAPI <strong>CORSMiddleware</strong> + proxy rewrites in next.config.mjs.</p>
+        </div>
+      </div>
+      <div class="card" style="display:flex; gap:20px; align-items:center;">
+        <div class="icon-circle ic-green" style="width:44px;height:44px;font-size:18px;">🗂️</div>
+        <div style="flex:1;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <h4>Different Dataset Shapes per User</h4>
+            <span class="badge badge-green">Solved</span>
+          </div>
+          <p style="font-size:13px; margin:0;"><strong>Problem:</strong> Every uploaded file has different columns/types. <strong>Solution:</strong> <strong>MongoDB</strong> (flexible schema) + <strong>Pandas auto type detection</strong> + dynamic Pydantic models.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SLIDE 15 — STATS + THANK YOU
+═══════════════════════════════════════════════════════════════════ -->
+<div class="slide" id="slide-15">
+  <div class="slide-tag">Summary</div>
+  <h2>Project <span class="gradient-text">Highlights</span></h2>
+  <div class="slide-content">
+    <div class="card-grid cols-4" style="gap:14px; margin-bottom:20px;">
+      <div class="stat-pill">
+        <div class="num gradient-text">13+</div>
+        <div class="lbl">API Route Modules</div>
+      </div>
+      <div class="stat-pill">
+        <div class="num gradient-text">10+</div>
+        <div class="lbl">ML Models Supported</div>
+      </div>
+      <div class="stat-pill">
+        <div class="num gradient-text">8+</div>
+        <div class="lbl">Data Source Connectors</div>
+      </div>
+      <div class="stat-pill">
+        <div class="num gradient-text">6</div>
+        <div class="lbl">Chart Libraries Used</div>
+      </div>
+    </div>
+
+    <div class="card" style="background: linear-gradient(135deg, rgba(99,102,241,.1), rgba(6,182,212,.1)); border-color:rgba(99,102,241,.4); margin-bottom:20px;">
+      <h3 style="text-align:center; margin-bottom:16px; font-size:18px;">What Makes Datalytics AI Special</h3>
+      <div class="card-grid cols-3" style="gap:12px;">
+        <div style="text-align:center;">
+          <div style="font-size:28px; margin-bottom:6px;">🚀</div>
+          <div style="font-size:13px; font-weight:700; color:#818cf8;">Full-Stack</div>
+          <p style="font-size:12px;">Complete frontend + backend + database + ML pipeline in one platform</p>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:28px; margin-bottom:6px;">🧠</div>
+          <div style="font-size:13px; font-weight:700; color:#22d3ee;">AI-Powered</div>
+          <p style="font-size:12px;">Groq LLM chatbot + smart recommendations + auto-insights</p>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:28px; margin-bottom:6px;">⚡</div>
+          <div style="font-size:13px; font-weight:700; color:#34d399;">Production Ready</div>
+          <p style="font-size:12px;">Async FastAPI + Redis cache + Celery workers + Gunicorn scaling</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex; align-items:center; gap:24px; padding:20px 28px;">
+      <div style="font-size:48px;">🙏</div>
+      <div>
+        <h3 style="font-size:22px; margin-bottom:4px;">Thank You!</h3>
+        <p style="font-size:14px; margin:0;">Built with ❤️ by <strong style="color:var(--text);">Sangam Singh</strong> &nbsp;|&nbsp; <span style="color:#818cf8;">singhsangam5400@gmail.com</span></p>
+      </div>
+      <div style="margin-left:auto; text-align:right;">
+        <p style="font-size:13px; margin:0 0 4px;">Questions? Let's discuss! 🎤</p>
+        <span class="badge badge-indigo">Open for Q&amp;A</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /deck -->
+
+<!-- Navigation -->
+<div class="nav">
+  <button id="btnPrev" onclick="changeSlide(-1)">← Prev</button>
+  <span class="slide-counter" id="counter">1 / 15</span>
+  <button id="btnNext" onclick="changeSlide(1)">Next →</button>
+</div>
+
+<script>
+  const totalSlides = 15;
+  let current = 1;
+
+  function getSlide(n) {
+    return document.getElementById('slide-' + n);
+  }
+
+  function changeSlide(dir) {
+    const next = current + dir;
+    if (next < 1 || next > totalSlides) return;
+
+    const curr = getSlide(current);
+    curr.classList.remove('active');
+    curr.classList.add('exit');
+    setTimeout(() => curr.classList.remove('exit'), 500);
+
+    current = next;
+    getSlide(current).classList.add('active');
+
+    document.getElementById('counter').textContent = current + ' / ' + totalSlides;
+    document.getElementById('progress').style.width = ((current / totalSlides) * 100) + '%';
+    document.getElementById('btnPrev').disabled = current === 1;
+    document.getElementById('btnNext').disabled = current === totalSlides;
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
+      e.preventDefault(); changeSlide(1);
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault(); changeSlide(-1);
+    }
+  });
+
+  // Init
+  document.getElementById('btnPrev').disabled = true;
+  document.getElementById('progress').style.width = ((1 / totalSlides) * 100) + '%';
+</script>
+</body>
+</html>

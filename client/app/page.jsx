@@ -392,7 +392,7 @@ const styles = `
 
   /* PRODUCT PREVIEW */
   .product-preview { padding: 60px 3% 80px; position: relative; z-index: 1; }
-  .preview-browser { max-width: 1200px; margin: 0 auto; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 100px rgba(255,77,46,0.1); animation: previewFloat 6s ease-in-out infinite; }
+  .preview-browser { max-width: 1200px; margin: 0 auto; border-radius: 18px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 100px rgba(255,77,46,0.1); animation: previewFloat 6s ease-in-out infinite; position: relative; }
   @keyframes previewFloat { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
   .preview-bar { background: #1a1d2e; padding: 14px 22px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
   .preview-dots { display:flex; gap:7px; }
@@ -405,6 +405,68 @@ const styles = `
   .preview-tab { background:none; border:none; border-bottom:2px solid transparent; padding:10px 20px; font-size:0.75rem; font-weight:600; color:rgba(255,255,255,0.4); cursor:pointer; white-space:nowrap; font-family:inherit; transition:all 0.2s; }
   .preview-tab:hover { color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.03); }
   .preview-tab.active { color:#fff; border-bottom-color:var(--orange); background:rgba(255,106,0,0.06); }
+  .preview-virtual-cursor {
+    position: absolute;
+    left: var(--cursor-x, 52%);
+    top: var(--cursor-y, 34%);
+    z-index: 9;
+    width: 26px;
+    height: 26px;
+    pointer-events: none;
+    filter: drop-shadow(0 12px 18px rgba(0,0,0,0.45));
+    transition: left 0.72s cubic-bezier(0.16,1,0.3,1), top 0.72s cubic-bezier(0.16,1,0.3,1);
+    animation: cursorTap 3.5s ease-in-out infinite;
+  }
+  .preview-virtual-cursor::before {
+    content: '';
+    position: absolute;
+    left: 3px;
+    top: 2px;
+    width: 18px;
+    height: 22px;
+    background: linear-gradient(135deg, #ffffff 0%, #dbeafe 100%);
+    clip-path: polygon(0 0, 0 100%, 38% 73%, 58% 100%, 78% 91%, 58% 66%, 100% 66%);
+    border: 1px solid rgba(15,23,42,0.45);
+  }
+  .preview-virtual-cursor::after {
+    content: '';
+    position: absolute;
+    left: -10px;
+    top: -10px;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,106,0,0.52);
+    opacity: 0;
+    transform: scale(0.45);
+    animation: cursorRing 3.5s ease-in-out infinite;
+  }
+  .preview-cursor-label {
+    position: absolute;
+    left: 22px;
+    top: 20px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(15,23,42,0.9);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: #fff;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  @keyframes cursorTap {
+    0%, 50%, 100% { transform: translate3d(0,0,0) scale(1); }
+    58% { transform: translate3d(1px,1px,0) scale(0.9); }
+    66% { transform: translate3d(0,0,0) scale(1); }
+  }
+  @keyframes cursorRing {
+    52% { opacity: 0; transform: scale(0.45); }
+    62% { opacity: 1; transform: scale(1); }
+    78%, 100% { opacity: 0; transform: scale(1.75); }
+  }
   .preview-content { background:#0d1225; display:grid; grid-template-columns:240px 1fr; min-height:500px; }
   .preview-sidebar { background:#0a0e1a; border-right:1px solid rgba(255,255,255,0.05); padding:20px 0; }
   .ps-logo { padding:0 20px 20px; font-weight:800; font-size:1rem; color:#fff; border-bottom:1px solid rgba(255,255,255,0.05); margin-bottom:12px; }
@@ -962,6 +1024,9 @@ const styles = `
     .preview-bar { padding: 12px; gap: 9px; }
     .preview-url { min-width: 0; padding: 6px 10px; font-size: 0.66rem; overflow: hidden; text-overflow: ellipsis; }
     .preview-badge { display: none; }
+    .preview-virtual-cursor {
+      display: none;
+    }
     .preview-content { grid-template-columns: 1fr; min-height: auto; }
     .preview-sidebar { display: none; }
     .preview-main { padding: 18px; }
@@ -1227,6 +1292,15 @@ const SIDEBAR_ITEMS = [
   { icon: '🧠', label: 'Decision Engine', badge: 'IN PROGRESS', cls: 'psb-prog', screenId: 'ai'      },
 ];
 
+const PREVIEW_CURSOR_POSITIONS = [
+  { x: '13%', y: '42%', label: 'Upload' },
+  { x: '13%', y: '49%', label: 'Explore' },
+  { x: '13%', y: '56%', label: 'Charts' },
+  { x: '13%', y: '63%', label: 'Predict' },
+  { x: '13%', y: '70%', label: 'Dashboard' },
+  { x: '13%', y: '77%', label: 'Decide' },
+];
+
 function ProductPreview() {
   const [screenIdx, setScreenIdx] = useState(0);
   const [fade, setFade] = useState(true);
@@ -1246,9 +1320,18 @@ function ProductPreview() {
   const screen = PREVIEW_SCREENS[screenIdx];
   const totalScreens = PREVIEW_SCREENS.length;
   const progressPct = Math.round(((screenIdx + 1) / totalScreens) * 100);
+  const cursor = PREVIEW_CURSOR_POSITIONS[screenIdx] || PREVIEW_CURSOR_POSITIONS[0];
 
   return (
     <div className="preview-browser">
+      <div
+        className="preview-virtual-cursor"
+        style={{ '--cursor-x': cursor.x, '--cursor-y': cursor.y }}
+        aria-hidden="true"
+      >
+        <span className="preview-cursor-label">{cursor.label}</span>
+      </div>
+
       {/* Browser chrome */}
       <div className="preview-bar">
         <div className="preview-dots">

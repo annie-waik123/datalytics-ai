@@ -6,6 +6,7 @@ import {
   HiOutlineChatBubbleLeftRight,
   HiOutlineChevronDoubleLeft,
   HiOutlineChevronDoubleRight,
+  HiOutlineCommandLine,
   HiOutlineCpuChip,
   HiOutlineDocumentText,
   HiOutlineLightBulb,
@@ -27,6 +28,7 @@ const NAV_ITEMS = [
   { key: 'recommendations', label: 'Recommendations', icon: HiOutlineSparkles },
   { key: 'decisionMaking', label: 'Decision Making', icon: HiOutlineLightBulb },
   { key: 'aiInsights', label: 'AI Insights', icon: HiOutlineChatBubbleLeftRight },
+  { key: 'analyst', label: 'AI Analyst', icon: HiOutlineCommandLine },
   { key: 'reports', label: 'Reports', icon: HiOutlineDocumentText },
 ]
 

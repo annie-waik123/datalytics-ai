@@ -45,6 +45,7 @@ const PowerBIDashboardStep = lazy(() => import('./components/PowerBIDashboardSte
 const RecommendationStep = lazy(() => import('./components/RecommendationStep.jsx'))
 const ReportStep = lazy(() => import('./components/ReportStep.jsx'))
 const AIInsightsStep = lazy(() => import('./components/AIInsightsStep.jsx'))
+const AIAnalystStep = lazy(() => import('./components/analyst/AIAnalystStep.jsx'))
 const DecisionMakingStep = lazy(() => import('./components/DecisionMakingStep.jsx'))
 const UserProfileStep = lazy(() => import('./components/profile/UserProfileStep.jsx'))
 const ChatBot = lazy(() => import('./components/ChatBot.jsx'))
@@ -61,6 +62,7 @@ const DEFAULT_COMPLETED = {
   decisionMaking: false,
   reports: false,
   aiInsights: false,
+  analyst: false,
 }
 
 const DEFAULT_PREDICTION_STATE = {
@@ -155,6 +157,7 @@ function getStepLabel(step) {
     decisionMaking: 'Decision Making',
     reports: 'Reports',
     aiInsights: 'AI Insights',
+    analyst: 'AI Analyst',
     profile: 'Profile',
   }
   return labels[step] || 'Dashboard'
@@ -586,6 +589,7 @@ function AppShell() {
       powerbi:         ['Dashboard','dashboards', 'Power BI Dashboard created'],
       reports:         ['Report',   'reports',    'Pipeline report generated'],
       aiInsights:      ['Query',    'queries',    'AI insight query run'],
+      analyst:         ['Query',    'queries',    'AI analyst run completed'],
       recommendations: ['Query',    'queries',    'Recommendations generated'],
       decisionMaking:  ['Decision', 'queries',    'Decision making completed'],
     }
@@ -923,6 +927,17 @@ function AppShell() {
         return (
           <Suspense fallback={<StepLoader label="AI insights" />}>
             <AIInsightsStep
+              dataset={dataset}
+              datasetProfile={datasetProfile}
+              onComplete={markComplete}
+              onJumpToUpload={() => handleStepChange('upload')}
+            />
+          </Suspense>
+        )
+      case 'analyst':
+        return (
+          <Suspense fallback={<StepLoader label="AI analyst" />}>
+            <AIAnalystStep
               dataset={dataset}
               datasetProfile={datasetProfile}
               onComplete={markComplete}

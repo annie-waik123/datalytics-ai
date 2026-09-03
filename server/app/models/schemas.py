@@ -202,3 +202,138 @@ class FeatureInfo(BaseModel):
     ohe_groups: Dict[str, List[str]]           # orig_col → list of category values
     numeric_feats: List[str]
     feature_stats: Dict[str, Dict[str, float]] # feat → {min, max, median}
+
+
+# ── AI Analyst / Natural-Language Analytics ────────────────────────────────────
+
+class AnalyticsIntent(BaseModel):
+    """Validated, schema-resolved intent produced by the interpretation layer."""
+    operation: str = "groupby"   # groupby | top | compare | time_series | scatter | correlation | distribution | missing | filter | trend_break
+    dimension: Optional[str] = None
+    metric: Optional[str] = None
+    metric2: Optional[str] = None
+    date_column: Optional[str] = None
+    aggregation: str = "sum"     # sum | avg | min | max | count
+    visualization: str = "auto"  # auto | bar | line | pie | scatter | histogram | heatmap | table
+    limit: Optional[int] = 10
+    filters: List[Dict[str, Any]] = Field(default_factory=list)
+    note: Optional[str] = None
+
+
+class NLQueryRequest(BaseModel):
+    query: str
+    mode: Optional[str] = "auto"  # auto | chart | table | metric
+    include_explanation: bool = True
+
+
+class NLInterpretRequest(BaseModel):
+    query: str
+
+
+class AnalystExecuteRequest(BaseModel):
+    request: str
+    mode: Optional[str] = "auto"          # auto | quick | deep
+    include_ml: Optional[bool] = None     # force ML comparison on/off
+    include_charts: Optional[bool] = None # force chart generation on/off
+    max_charts: Optional[int] = 3
+    context: Dict[str, Any] = Field(default_factory=dict)
+
+
+# Generic structured report pieces (kept permissive so responses are forward-compatible).
+
+class ReportFinding(BaseModel):
+    title: str
+    summary: str
+    category: Optional[str] = None
+    severity: Optional[str] = "info"       # info | success | warning | critical
+    evidence: List[str] = Field(default_factory=list)
+    chart_ids: List[str] = Field(default_factory=list)
+
+
+class ReportRecommendation(BaseModel):
+    action: str
+    why: str = ""
+    evidence: List[str] = Field(default_factory=list)
+    priority: Optional[str] = "medium"     # high | medium | low
+
+
+class ReportMetric(BaseModel):
+    label: str
+    value: Any = None
+    formatted: Optional[str] = None
+    hint: Optional[str] = None
+
+
+class ReportAction(BaseModel):
+    key: str
+    label: str
+    status: str              # done | skipped | error | running
+    detail: Optional[str] = None
+    duration_ms: Optional[float] = None
+    error: Optional[str] = None
+
+
+class ReportStep(BaseModel):
+    key: str
+    label: str
+
+
+class ReportVisualization(BaseModel):
+    id: str
+    title: str
+    chart_type: str
+    figure: Dict[str, Any] = Field(default_factory=dict)
+    insight: Optional[str] = None
+
+
+class ReportTable(BaseModel):
+    title: str
+    columns: List[str]
+    rows: List[Dict[str, Any]]
+
+
+class AnalystReport(BaseModel):
+    request: str
+    mode: str = "agent"
+    plan: List[ReportStep] = Field(default_factory=list)
+    actions: List[ReportAction] = Field(default_factory=list)
+    findings: List[ReportFinding] = Field(default_factory=list)
+    recommendations: List[ReportRecommendation] = Field(default_factory=list)
+    metrics: List[ReportMetric] = Field(default_factory=list)
+    visualizations: List[ReportVisualization] = Field(default_factory=list)
+    tables: List[ReportTable] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+    dataset: Dict[str, Any] = Field(default_factory=dict)
+    confidence: Optional[str] = "medium"   # high | medium | low
+    narrative: Optional[str] = None
+    llm_used: bool = False
+    source: Optional[str] = "agent"
+    error: Optional[str] = None
+    duration_ms: Optional[float] = None
+
+
+class NLQueryResponse(BaseModel):
+    query: str
+    intent: AnalyticsIntent = Field(default_factory=AnalyticsIntent)
+    status: str = "ok"                     # ok | needs_clarification | unsupported | error
+    charts: List[ReportVisualization] = Field(default_factory=list)
+    tables: List[ReportTable] = Field(default_factory=list)
+    metrics: List[ReportMetric] = Field(default_factory=list)
+    explanation: Dict[str, Any] = Field(default_factory=dict)
+    detected_columns: Dict[str, Any] = Field(default_factory=dict)
+    filters: List[Dict[str, Any]] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+    dataset: Dict[str, Any] = Field(default_factory=dict)
+    message: Optional[str] = None
+
+
+class NLInterpretResponse(BaseModel):
+    query: str
+    intent: AnalyticsIntent = Field(default_factory=AnalyticsIntent)
+    status: str = "ready"                  # ready | needs_clarification | unsupported
+    corrections: List[str] = Field(default_factory=list)
+    confidence: Optional[str] = "medium"
+    source: Optional[str] = "rules"        # llm | rules
+    available: Dict[str, Any] = Field(default_factory=dict)
+    message: Optional[str] = None

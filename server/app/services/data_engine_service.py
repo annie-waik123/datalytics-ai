@@ -122,6 +122,23 @@ def restore_live_dataset(session: Any, session_id: str, document: dict[str, Any]
     return has_live_dataset(session)
 
 
+async def ensure_live_dataset(session: Any, session_id: str) -> bool:
+    """
+    Ensure the session has a live DataFrame (restoring from the saved dataset
+    file when the session was recreated after a restart).
+    """
+    if has_live_dataset(session):
+        return True
+    try:
+        from app.core.database import get_dataset
+        document = await get_dataset(session_id)
+        if document is not None:
+            return restore_live_dataset(session, session_id, document)
+    except Exception:
+        pass
+    return has_live_dataset(session)
+
+
 def build_dataset_json_payload(session: Any, row_limit: int = DEFAULT_EXPORT_LIMIT) -> dict[str, Any]:
     columns = _available_columns(session)
     limit = max(1, min(int(row_limit or DEFAULT_EXPORT_LIMIT), MAX_EXPORT_LIMIT))

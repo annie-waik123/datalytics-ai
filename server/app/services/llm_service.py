@@ -1,6 +1,9 @@
 """
-LLM service using OpenAI API.
-Centralizes ChatGPT-compatible generation for chat, recommendations,
+LLM service using OpenAI-compatible chat APIs.
+
+Supports OpenAI (https://api.openai.com/v1) and Groq
+(https://api.groq.com/openai/v1) through the same ``openai`` SDK.
+Centralizes chat-compatible generation for chat, recommendations,
 AI insights, reports, and decision making.
 """
 from __future__ import annotations
@@ -18,24 +21,46 @@ load_dotenv(dotenv_path=_ENV_PATH, override=True)
 
 log = logging.getLogger(__name__)
 
-# Support both env var names
+# ---- Provider selection ------------------------------------------------------
+# LLM_PROVIDER: "groq" | "openai" | "auto" (default). Groq exposes an
+# OpenAI-compatible API, so the same openai SDK is reused for both.
+PROVIDER_CHOICE = os.getenv("LLM_PROVIDER", "").strip().lower()
+
 OPEN_AI_KEY = (
     os.getenv("OPENAI_API_KEY", "").strip()
     or os.getenv("OPEN_AI_KEY", "").strip()
 )
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
 
-MODEL = (
-    os.getenv("OPENAI_MODEL", "").strip()
-    or os.getenv("OPEN_AI_MODEL", "").strip()
-    or "gpt-4o-mini"
-)
+if PROVIDER_CHOICE == "groq":
+    LLM_PROVIDER = "groq"
+elif PROVIDER_CHOICE == "openai":
+    LLM_PROVIDER = "openai"
+else:  # auto — prefer Groq when its key is configured
+    LLM_PROVIDER = "groq" if GROQ_API_KEY else "openai"
+
+if LLM_PROVIDER == "groq":
+    API_KEY = GROQ_API_KEY
+    BASE_URL = "https://api.groq.com/openai/v1"
+    MODEL = os.getenv("GROQ_MODEL", "").strip() or "llama-3.3-70b-versatile"
+else:
+    API_KEY = OPEN_AI_KEY
+    BASE_URL = os.getenv("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1"
+    MODEL = (
+        os.getenv("OPENAI_MODEL", "").strip()
+        or os.getenv("OPEN_AI_MODEL", "").strip()
+        or "gpt-4o-mini"
+    )
 
 try:
-    client = openai.OpenAI(api_key=OPEN_AI_KEY) if OPEN_AI_KEY else None
-    if not OPEN_AI_KEY:
-        log.warning("WARNING: No OpenAI API key found in .env — AI features will be limited")
+    client = openai.OpenAI(api_key=API_KEY, base_url=BASE_URL) if API_KEY else None
+    if not API_KEY:
+        log.warning(
+            "WARNING: No %s API key found in .env — AI features will be limited",
+            LLM_PROVIDER.upper(),
+        )
 except Exception as e:
-    log.warning(f"Could not initialize OpenAI client: {e}")
+    log.warning(f"Could not initialize {LLM_PROVIDER} LLM client: {e}")
     client = None
 
 
@@ -83,20 +108,20 @@ def _create_chat_completion(
 
 def get_active_llm_summary() -> dict[str, Any]:
     return {
-        "configured": bool(OPEN_AI_KEY),
-        "provider": "openai",
+        "configured": bool(API_KEY),
+        "provider": LLM_PROVIDER,
         "model": MODEL,
-        "base_url": "https://api.openai.com/v1",
+        "base_url": BASE_URL,
     }
 
 
 def has_groq_config() -> bool:
-    """Compatibility alias — returns True when OpenAI key is set."""
-    return bool(OPEN_AI_KEY)
+    """Compatibility alias — returns True when an LLM API key is configured."""
+    return bool(API_KEY)
 
 
 def has_llm_config() -> bool:
-    return bool(OPEN_AI_KEY)
+    return bool(API_KEY)
 
 
 def groq_chat(
@@ -107,13 +132,14 @@ def groq_chat(
     model: str | None = None,
     retries: int | None = None,
 ) -> str:
-    """OpenAI chat completion.
+    """Chat completion against the configured provider.
 
     Function name ``groq_chat`` is retained as a compatibility shim for
-    existing callers, but this always uses OpenAI.
+    existing callers; the active provider is chosen by LLM_PROVIDER
+    ("openai" or "groq") in the environment.
     """
     if not client:
-        log.warning("OpenAI client is not initialized — key missing.")
+        log.warning("%s client is not initialized — key missing.", LLM_PROVIDER.title())
         return ""
 
     effective_model = model or MODEL
@@ -128,16 +154,20 @@ def groq_chat(
         )
         result = response.choices[0].message.content or ""
         if result:
-            log.info(f"OpenAI [{effective_model}] responded OK ({len(result)} chars).")
+            log.info(f"{LLM_PROVIDER.title()} [{effective_model}] responded OK ({len(result)} chars).")
         return result
     except openai.RateLimitError:
-        log.error("OpenAI rate limit hit")
+        log.error("%s rate limit hit", LLM_PROVIDER.title())
         raise
     except openai.AuthenticationError:
-        log.error("OpenAI authentication failed — check OPENAI_API_KEY in .env")
+        log.error(
+            "%s authentication failed — check the %s API key in .env",
+            LLM_PROVIDER.title(),
+            LLM_PROVIDER.upper(),
+        )
         raise
     except Exception as exc:
-        log.error(f"OpenAI chat.completions failed [{effective_model}]: {exc}")
+        log.error(f"{LLM_PROVIDER.title()} chat.completions failed [{effective_model}]: {exc}")
         raise
 
 
@@ -165,7 +195,9 @@ def generate_recommendations_with_ai(df) -> dict:
     Falls back gracefully if API is unavailable.
     """
     if not client:
-        raise RuntimeError("OpenAI client not initialised — check OPENAI_API_KEY in .env")
+        raise RuntimeError(
+            f"{LLM_PROVIDER.title()} client not initialised — check the API key in .env"
+        )
 
     import pandas as pd
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
@@ -244,7 +276,7 @@ Rules: minimum 6 ai_insights, minimum 4 actionable_recommendations. Always refer
         raise HTTPException(status_code=429, detail="AI rate limit hit, retry in 30 seconds")
     except openai.AuthenticationError:
         from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="Invalid OpenAI API key in .env")
+        raise HTTPException(status_code=401, detail="Invalid LLM API key in .env")
     except Exception as e:
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
@@ -255,7 +287,9 @@ def generate_decisions_with_ai(df, recommendations: dict = None) -> dict:
     Generate executive-level decisions using OpenAI.
     """
     if not client:
-        raise RuntimeError("OpenAI client not initialised — check OPENAI_API_KEY in .env")
+        raise RuntimeError(
+            f"{LLM_PROVIDER.title()} client not initialised — check the API key in .env"
+        )
 
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
     stats = {
@@ -326,7 +360,7 @@ Rules: minimum 4 top_decisions, minimum 5 smart_actions, minimum 3 risks. Refere
         raise HTTPException(status_code=429, detail="AI rate limit hit, retry in 30 seconds")
     except openai.AuthenticationError:
         from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="Invalid OpenAI API key in .env")
+        raise HTTPException(status_code=401, detail="Invalid LLM API key in .env")
     except Exception as e:
         from fastapi import HTTPException
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")

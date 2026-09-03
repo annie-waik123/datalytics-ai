@@ -26,6 +26,7 @@ from app.api.v1.routes import data, upload, preprocess, train, predict, eda
 from app.api.v1.routes import auth
 from app.api.v1.routes import chatbot, recommendations, reports, payment
 from app.api.v1.routes import activity, admin
+from app.api.v1.routes import analyst, analytics
 from app.core.database import ping_db
 
 
@@ -86,6 +87,8 @@ app.include_router(reports.router,         prefix="/api", tags=["Reports"])
 app.include_router(payment.router,         prefix="/api", tags=["Payment"])
 app.include_router(activity.router,        prefix="/api", tags=["Activity"])
 app.include_router(admin.router,           prefix="/api", tags=["Admin"])
+app.include_router(analyst.router,         prefix="/api", tags=["AI Analyst"])
+app.include_router(analytics.router,       prefix="/api", tags=["Natural-Language Analytics"])
 
 
 @app.get("/")

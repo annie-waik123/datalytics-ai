@@ -955,7 +955,7 @@ def generate_mode_response(
     source = "local_fallback"
     provider = "local_fallback"
     error_message = None
-    api_key_configured = has_groq_config()  # returns True when OPEN_AI_KEY is set
+    api_key_configured = has_groq_config()  # True when the active provider has a key
 
     try:
         if api_key_configured:
@@ -975,13 +975,15 @@ def generate_mode_response(
     if not content:
         if api_key_configured and error_message:
             # API key was set but the call failed — surface the error clearly
+            provider_label = str(llm_meta.get("provider") or "LLM").title()
+            key_env = "GROQ_API_KEY" if str(llm_meta.get("provider")) == "groq" else "OPEN_AI_KEY"
             content = (
-                f"⚠️ **Eighteen AI could not respond right now.**\n\n"
-                f"The OpenAI API returned an error: `{error_message}`\n\n"
+                f"⚠️ **AI could not respond right now.**\n\n"
+                f"The {provider_label} API returned an error: `{error_message}`\n\n"
                 "Please check:\n"
-                "- Your `OPEN_AI_KEY` in `server/.env` is valid\n"
+                f"- Your `{key_env}` in `server/.env` is valid\n"
                 "- You have sufficient API credits\n"
-                f"- The model `{llm_meta.get('model') or 'gpt-4o-mini'}` is accessible on your plan\n\n"
+                f"- The model `{llm_meta.get('model') or ''}` is accessible on your plan\n\n"
                 "Once resolved, restart the backend server and retry."
             )
             source = "api_error"
